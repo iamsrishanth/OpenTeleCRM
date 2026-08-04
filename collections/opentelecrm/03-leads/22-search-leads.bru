@@ -27,6 +27,6 @@ body:json {
 
 assert {
   res.status: eq 200
-  res.body.data: defined
-  res.body.total: defined
+  res.body.data: isDefined
+  res.body.total: isDefined
 }

@@ -27,5 +27,5 @@ body:json {
 assert {
   res.status: eq 200
   res.body.validated: eq true
-  res.body.fields: defined
+  res.body.fields: isDefined
 }

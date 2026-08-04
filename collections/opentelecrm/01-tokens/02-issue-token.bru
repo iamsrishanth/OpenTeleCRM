@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/api-tokens
   body: json
-  auth: bearer
+  auth: none
 }
 
 headers {
@@ -22,10 +22,6 @@ body:json {
   }
 }
 
-auth:bearer {
-  token: {{authToken}}
-}
-
 script:post-response {
   const data = res.body.data;
   if (data && data.rawToken) {
@@ -35,5 +31,5 @@ script:post-response {
 
 assert {
   res.status: eq 201
-  res.body.data.rawToken: defined
+  res.body.data.rawToken: isDefined
 }

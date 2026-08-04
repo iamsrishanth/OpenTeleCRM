@@ -34,5 +34,5 @@ script:post-response {
 
 assert {
   res.status: eq 200
-  res.body.callId: defined
+  res.body.callId: isDefined
 }

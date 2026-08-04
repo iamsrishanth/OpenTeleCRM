@@ -34,6 +34,6 @@ script:post-response {
 
 assert {
   res.status: eq 200
-  res.body.id: defined
+  res.body.id: isDefined
   res.body.direction: eq outbound
 }

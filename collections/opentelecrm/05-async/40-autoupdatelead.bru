@@ -30,5 +30,5 @@ body:json {
 assert {
   res.status: eq 200
   res.body.success: eq true
-  res.body.requestId: defined
+  res.body.requestId: isDefined
 }
