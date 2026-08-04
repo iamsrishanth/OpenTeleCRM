@@ -43,14 +43,14 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A2.1 | 1-Click WhatsApp | — | — | ❌ | — | — |
-| A2.2 | Chat Sync | — | — | ❌ | — | — |
-| A2.3 | WhatsApp Cloud API | — | — | ❌ | — | — |
-| A2.4 | Broadcast | — | — | ❌ | — | — |
-| A2.5 | Chatbot | — | — | ❌ | — | — |
-| A2.6 | Notifications | — | — | ❌ | — | — |
-| A2.7 | Website widget | — (`apps/widget` empty placeholder) | — | ❌ | — | — |
-| A2.8 | Drip / sequences | — | — | ❌ | — | — |
+| A2.1 | 1-Click WhatsApp | `services/whatsapp` mock + Baileys drivers (`sendText`), API `POST /enterprise/{eid}/whatsapp/send` | @whiskeysockets/baileys, contracts | 🚧 | API + mock driver green; real-number pairing needs CLI (`pnpm --filter @opentelecrm/whatsapp pair`) | `whatsapp-inbox.contract.test.ts` |
+| A2.2 | Chat Sync | `wa_session`/`conversation`/`wa_message` tables, `InboxService` (persist + auto lead-attribution), `GET /whatsapp/conversations` + messages | Baileys, Drizzle | 🚧 | Mock path + persistence verified; live chat sync requires paired Baileys session | `whatsapp-inbox.contract.test.ts` |
+| A2.3 | WhatsApp Cloud API | — (Meta Graph API adapter planned) | — | ❌ | Cloud-api driver is a stub in the provider interface; Meta WABA onboarding deferred | — |
+| A2.4 | Broadcast | `wa_broadcast` + `consent_ledger` tables, `POST /whatsapp/broadcasts` + `:id/start` + opt-out, recipients from leadIds | Drizzle, mock driver | 🚧 | Mock-driver path green (no throttle/jitter — lives in Baileys driver); real broadcast needs paired session | `whatsapp-template-broadcast.contract.test.ts` |
+| A2.5 | Chatbot | — | — | ❌ | Flow builder + LLM fallback deferred to P2 follow-up / P4 | — |
+| A2.6 | Notifications | — | — | ❌ | Agent notification surface deferred (notifier service) | — |
+| A2.7 | Website widget | — (`apps/widget` empty placeholder) | — | ❌ | Widget SDK deferred | — |
+| A2.8 | Drip / sequences | — | — | ❌ | Sequences deferred to P4 automation | — |
 
 ---
 
@@ -161,7 +161,7 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 |---|---|---|---|
 | F Foundation | 2 | 0 | 0 |
 | A1 Sales & Call | 0 | 0 | 8 |
-| A2 WhatsApp | 0 | 0 | 8 |
+| A2 WhatsApp | 3 🚧 (A2.1, A2.2, A2.4) | 0 | 5 |
 | A3 Lead Capture | 0 | 0 | 2 |
 | A4 Automation | 0 | 0 | 7 |
 | A5 Reports | 0 | 0 | 6 |
@@ -170,6 +170,6 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 | A8 Support & Onboarding | 0 | 0 | 3 |
 | B Plans & Billing | 0 | 0 | 3 |
 
-**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **Bruno collection (`collections/opentelecrm/`) runs 14/14 green against the live API** — the P1 exit gate. Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7). Everything in A1–A5, A7, A8, B is not yet built.
+**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **P2 WhatsApp (Partial 🚧):** contracts + provider abstraction, mock + Baileys drivers, unified inbox with auto lead-attribution, templates CRUD, broadcasts (create/start/opt-out) via mock driver — 43/43 contract tests, **17/17 Bruno collection green**. **Bruno collection (`collections/opentelecrm/`) runs green against the live API.** Real-number pairing is a documented CLI step (`pnpm --filter @opentelecrm/whatsapp pair`). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7), WhatsApp cloud-api/chatbot/widget/notifications. Everything in A1, A3–A5, A7, A8, B is not yet built.
 
 _Last updated: 2026-08-04. Keep in sync with `services/api`, `services/mcp`, `packages/db` as features land._
