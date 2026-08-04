@@ -35,3 +35,4 @@ logs/
 
 # --- Infra runtime ---
 infra/docker/volumes/
+.data/

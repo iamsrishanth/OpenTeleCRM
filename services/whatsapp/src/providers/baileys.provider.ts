@@ -15,6 +15,7 @@
  */
 import { EventEmitter } from 'node:events';
 import * as Baileys from '@whiskeysockets/baileys';
+import { FileCredentialStore, type BaileysCredentialStore } from './credential-store.js';
 
 // Destructure runtime pieces from the namespace import. `proto` is a CJS
 // export not exposed as a named ESM binding, hence the namespace access.
@@ -52,17 +53,12 @@ interface ProviderEvents {
 }
 
 /**
- * Persistence seam. v1 ships the in-memory InMemorySignalKeyStore; later this
- * can write creds/keys to the wa_session table keyed by agentSessionId.
+ * Persistence seam. Implementations (FileCredentialStore, NoopCredentialStore)
+ * live in credential-store.ts — kept here as a type re-export for imports.
  */
-export interface BaileysCredentialStore {
-  loadCreds(agentSessionId: string): Promise<AuthenticationCreds | null>;
-  saveCreds(agentSessionId: string, creds: AuthenticationCreds): Promise<void>;
-  loadKeys(agentSessionId: string): Promise<SignalDataSet>;
-  saveKeys(agentSessionId: string, data: SignalDataSet): Promise<void>;
-}
+export type { BaileysCredentialStore } from './credential-store.js';
 
-/** No-op store — everything stays in memory this phase. */
+/** No-op store — kept for tests that must not touch disk. */
 class NoopCredentialStore implements BaileysCredentialStore {
   loadCreds(): Promise<AuthenticationCreds | null> {
     return Promise.resolve(null);
@@ -216,7 +212,7 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
   };
 
   constructor(options?: { persist?: BaileysCredentialStore; browser?: [string, string, string] }) {
-    this.persist = options?.persist ?? new NoopCredentialStore();
+    this.persist = options?.persist ?? new FileCredentialStore();
     this.constructorOptions = {
       browser: options?.browser ?? ['OpenTeleCRM', 'Chrome', '7.0.0'],
     };
@@ -238,8 +234,25 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
       return this.sessionStatus(agentSessionId);
     }
 
-    const creds = (await this.persist.loadCreds(agentSessionId)) ?? initAuthCreds();
+    const loaded = (await this.persist.loadCreds(agentSessionId)) ?? initAuthCreds();
+    // If a pairing-code attempt left a partial `me` (from requestPairingCode)
+    // but the device was never registered, strip it so the socket re-enters
+    // registration mode instead of sending a login node the server rejects.
+    const creds: AuthenticationCreds =
+      loaded.me && !loaded.registered
+        ? { ...loaded, me: undefined, pairingCode: undefined }
+        : loaded;
     const keys = new InMemorySignalKeyStore(agentSessionId, this.persist);
+
+    // WhatsApp rejects registration handshakes from stale client versions.
+    // Fetch the latest supported WA web version at connect time and pin it.
+    let version: [number, number, number] | undefined;
+    try {
+      const { version: latest } = await Baileys.fetchLatestBaileysVersion();
+      version = latest;
+    } catch {
+      // network hiccup — fall back to letting Baileys use its default
+    }
 
     const sock = makeWASocket({
       printQRInTerminal: false,
@@ -247,6 +260,9 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
       browser: this.constructorOptions?.browser ?? ['OpenTeleCRM', 'Chrome', '7.0.0'],
       syncFullHistory: false,
       markOnlineOnConnect: true,
+      version,
+      connectTimeoutMs: 60_000,
+      keepAliveIntervalMs: 30_000,
     });
 
     const record: BaileysSessionRecord = {
@@ -408,6 +424,30 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
     BaileysWhatsAppProvider.dropSession(agentSessionId);
   }
 
+  /**
+   * Request a pairing code instead of a QR. The phone number must be the full
+   * international digits (e.g. '918465067156') WITHOUT '+' or the '@s.whatsapp.net'
+   * suffix. Returns the 8-digit code, which the user enters in
+   * WhatsApp > Settings > Linked devices > Link with phone number.
+   */
+  async requestPairingCode(agentSessionId: string, phoneNumber: string): Promise<string> {
+    const session = this.require(agentSessionId);
+    const sock = session.sock;
+
+    // The socket needs a live WS to the WA server before it can ask for a
+    // pairing code. The QR event normally guarantees this, but wait briefly
+    // in case we're called slightly before the handshake settles.
+    for (let i = 0; i < 30 && !sock.ws?.isOpen; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!sock.ws?.isOpen) {
+      throw new Error('baileys socket not connected — cannot request pairing code');
+    }
+
+    const code = await sock.requestPairingCode(phoneNumber);
+    return code;
+  }
+
   // ---- internals ---------------------------------------------------------
 
   private require(agentSessionId: string): BaileysSessionRecord {
@@ -449,6 +489,9 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
           code === DisconnectReason.multideviceMismatch ||
           code === DisconnectReason.forbidden;
         this.setStatus(session, dead ? 'dead' : 'disconnected');
+        // Drop the stale record so a subsequent connect() creates a fresh
+        // socket instead of returning the dead record immediately.
+        BaileysWhatsAppProvider.dropSession(agentSessionId);
         return;
       }
 

@@ -1,0 +1,402 @@
+{
+  "/mnt/data/Projects/ByteCodeCRM/.graphify_detect.json": {
+    "mtime": 1785840287.2003376,
+    "ast_hash": "42638b949cf02c639362ab72c8374b85",
+    "semantic_hash": "42638b949cf02c639362ab72c8374b85"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/biome.json": {
+    "mtime": 1785826087.3128297,
+    "ast_hash": "86a6d7fd5c1030e4223445d8752ae62f",
+    "semantic_hash": "86a6d7fd5c1030e4223445d8752ae62f"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/collections/opentelecrm/bruno.json": {
+    "mtime": 1785833340.5632672,
+    "ast_hash": "4c6f774f6a4f21ed3d4bf6a84f39c374",
+    "semantic_hash": "4c6f774f6a4f21ed3d4bf6a84f39c374"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/package.json": {
+    "mtime": 1785826067.748495,
+    "ast_hash": "1d7c7c27e233d27517bc41acf59e01c5",
+    "semantic_hash": "1d7c7c27e233d27517bc41acf59e01c5"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/contracts/package.json": {
+    "mtime": 1785833776.342988,
+    "ast_hash": "65041b06c9ed10584caf028f7c053369",
+    "semantic_hash": "65041b06c9ed10584caf028f7c053369"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/contracts/src/index.ts": {
+    "mtime": 1785835856.1100755,
+    "ast_hash": "1d78a3f1d95b6108494aa63e83de5406",
+    "semantic_hash": "1d78a3f1d95b6108494aa63e83de5406"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/contracts/tsconfig.json": {
+    "mtime": 1785833776.4189894,
+    "ast_hash": "f17da1af6f19107d67d7e9e134db731d",
+    "semantic_hash": "f17da1af6f19107d67d7e9e134db731d"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/core-domain/package.json": {
+    "mtime": 1785826251.7356315,
+    "ast_hash": "8188b8facd9377c4b5edc7211ca9fc48",
+    "semantic_hash": "8188b8facd9377c4b5edc7211ca9fc48"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/core-domain/src/index.ts": {
+    "mtime": 1785826251.9036343,
+    "ast_hash": "f0fee97d800b584b5f9bf23abfc90f22",
+    "semantic_hash": "f0fee97d800b584b5f9bf23abfc90f22"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/core-domain/tsconfig.json": {
+    "mtime": 1785826251.755632,
+    "ast_hash": "f17da1af6f19107d67d7e9e134db731d",
+    "semantic_hash": "f17da1af6f19107d67d7e9e134db731d"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/drizzle/0000_peaceful_speedball.sql": {
+    "mtime": 1785826537.6404724,
+    "ast_hash": "34515585e4504c02a6ceecbd6553fad1",
+    "semantic_hash": "34515585e4504c02a6ceecbd6553fad1"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/drizzle/0001_fancy_terrax.sql": {
+    "mtime": 1785834083.7044277,
+    "ast_hash": "c6d28917d55833ef85a15d76c30e822c",
+    "semantic_hash": "c6d28917d55833ef85a15d76c30e822c"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/drizzle/meta/0000_snapshot.json": {
+    "mtime": 1785826537.6404724,
+    "ast_hash": "a190ba11054f2b26f0a9a4c3102644a7",
+    "semantic_hash": "a190ba11054f2b26f0a9a4c3102644a7"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/drizzle/meta/0001_snapshot.json": {
+    "mtime": 1785834083.7044277,
+    "ast_hash": "b321004e0e4329b90a0009f5ca6746d3",
+    "semantic_hash": "b321004e0e4329b90a0009f5ca6746d3"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/drizzle/meta/_journal.json": {
+    "mtime": 1785834083.7044277,
+    "ast_hash": "7bd4580e8927a716c03453b13b1fcccd",
+    "semantic_hash": "7bd4580e8927a716c03453b13b1fcccd"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/package.json": {
+    "mtime": 1785833948.3060317,
+    "ast_hash": "e4e8b7463202c27fac265f02d427a22a",
+    "semantic_hash": "e4e8b7463202c27fac265f02d427a22a"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/drizzle.config.ts": {
+    "mtime": 1785834020.3953075,
+    "ast_hash": "7dd6d6d1e37742ee1933d836a4a20c2f",
+    "semantic_hash": "7dd6d6d1e37742ee1933d836a4a20c2f"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/index.ts": {
+    "mtime": 1785834483.8235056,
+    "ast_hash": "f81a2efd0bfd229a5b30c6ec68554fbb",
+    "semantic_hash": "f81a2efd0bfd229a5b30c6ec68554fbb"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/migrate.ts": {
+    "mtime": 1785826337.1250808,
+    "ast_hash": "81c3a23da85255c442b0ea4d37914767",
+    "semantic_hash": "81c3a23da85255c442b0ea4d37914767"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/rls.ts": {
+    "mtime": 1785833915.257447,
+    "ast_hash": "150a4b0be40dd461b72be7d59b4047a9",
+    "semantic_hash": "150a4b0be40dd461b72be7d59b4047a9"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/schema.ts": {
+    "mtime": 1785826319.3447793,
+    "ast_hash": "f9a488b7ebea4bbe6a8983c33eb7bbb2",
+    "semantic_hash": "f9a488b7ebea4bbe6a8983c33eb7bbb2"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/seed.ts": {
+    "mtime": 1785834668.8387778,
+    "ast_hash": "13d9fe73e57370a8f0863d7a29e85c84",
+    "semantic_hash": "13d9fe73e57370a8f0863d7a29e85c84"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/src/whatsapp-schema.ts": {
+    "mtime": 1785834607.7576976,
+    "ast_hash": "4f2fa4fccf057e59dc355d09a8523240",
+    "semantic_hash": "4f2fa4fccf057e59dc355d09a8523240"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/packages/db/tsconfig.json": {
+    "mtime": 1785826266.2638783,
+    "ast_hash": "c22ad6127ff4198a00086a9e89b147a2",
+    "semantic_hash": "c22ad6127ff4198a00086a9e89b147a2"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/renovate.json": {
+    "mtime": 1785826067.7764957,
+    "ast_hash": "b93be264aba129d404e99e121ed41889",
+    "semantic_hash": "b93be264aba129d404e99e121ed41889"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/scripts/db/init.sh": {
+    "mtime": 1785826152.057935,
+    "ast_hash": "963826097700bb51feb886cd672180f1",
+    "semantic_hash": "963826097700bb51feb886cd672180f1"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/scripts/db/seed.sh": {
+    "mtime": 1785826152.061935,
+    "ast_hash": "435430933c308b00eb50adabf5fc350e",
+    "semantic_hash": "435430933c308b00eb50adabf5fc350e"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/scripts/provision/debian.sh": {
+    "mtime": 1785826141.3737528,
+    "ast_hash": "76d8994ca8d66bd87407abee86a96320",
+    "semantic_hash": "76d8994ca8d66bd87407abee86a96320"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/dev-debug.sh": {
+    "mtime": 1785831196.1955552,
+    "ast_hash": "2c3feb23f31e9a21dd9cf986ea39b48d",
+    "semantic_hash": "2c3feb23f31e9a21dd9cf986ea39b48d"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/dev.sh": {
+    "mtime": 1785828129.0193787,
+    "ast_hash": "5bf2597bc8826be99cbac94eb041f9bd",
+    "semantic_hash": "5bf2597bc8826be99cbac94eb041f9bd"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/package.json": {
+    "mtime": 1785834796.477035,
+    "ast_hash": "225f46d6a1beb211eddc226560cff0b0",
+    "semantic_hash": "225f46d6a1beb211eddc226560cff0b0"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/__tests__/async.contract.test.ts": {
+    "mtime": 1785830719.250694,
+    "ast_hash": "c4bb471890c413f6430f31696d45e78c",
+    "semantic_hash": "c4bb471890c413f6430f31696d45e78c"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/__tests__/metadata.contract.test.ts": {
+    "mtime": 1785830719.2546942,
+    "ast_hash": "dd1fa867e61f75e4960a85750843b559",
+    "semantic_hash": "dd1fa867e61f75e4960a85750843b559"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/__tests__/sync.contract.test.ts": {
+    "mtime": 1785831829.0600402,
+    "ast_hash": "94ebcf13382c6e567affe3e2d425ffe1",
+    "semantic_hash": "94ebcf13382c6e567affe3e2d425ffe1"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/__tests__/whatsapp-inbox.contract.test.ts": {
+    "mtime": 1785835459.0430017,
+    "ast_hash": "64205e475196d858268613dbb8c50df5",
+    "semantic_hash": "64205e475196d858268613dbb8c50df5"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/__tests__/whatsapp-template-broadcast.contract.test.ts": {
+    "mtime": 1785835470.339056,
+    "ast_hash": "089f2c1110c756083d126a5a4284b326",
+    "semantic_hash": "089f2c1110c756083d126a5a4284b326"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/app.module.ts": {
+    "mtime": 1785835361.2826412,
+    "ast_hash": "6f737cb5e8a93da25b40a42fb992a82c",
+    "semantic_hash": "6f737cb5e8a93da25b40a42fb992a82c"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/async/async.controller.ts": {
+    "mtime": 1785830910.349894,
+    "ast_hash": "eac112afc7f4652d664d007042b44693",
+    "semantic_hash": "eac112afc7f4652d664d007042b44693"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/async/async.module.ts": {
+    "mtime": 1785829887.06077,
+    "ast_hash": "215e96011c4f06bf43d993ab05636eac",
+    "semantic_hash": "215e96011c4f06bf43d993ab05636eac"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/auth/auth.guard.ts": {
+    "mtime": 1785829991.9425232,
+    "ast_hash": "0b5d43a11c4187f2afd2259983eacf6e",
+    "semantic_hash": "0b5d43a11c4187f2afd2259983eacf6e"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/auth/auth.module.ts": {
+    "mtime": 1785830430.0458527,
+    "ast_hash": "c8cf4af7ed2fa2c08c4dfafcfbb6df28",
+    "semantic_hash": "c8cf4af7ed2fa2c08c4dfafcfbb6df28"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/auth/public.decorator.ts": {
+    "mtime": 1785827572.826008,
+    "ast_hash": "319a3385eecd43d720aecdd1681fd9ce",
+    "semantic_hash": "319a3385eecd43d720aecdd1681fd9ce"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/db/database.module.ts": {
+    "mtime": 1785827182.2833893,
+    "ast_hash": "ac692ca770170e81776a46842fe6dba8",
+    "semantic_hash": "ac692ca770170e81776a46842fe6dba8"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/health/health.controller.ts": {
+    "mtime": 1785827576.9700782,
+    "ast_hash": "cb1ef314e865a96534254c0ead9dd69f",
+    "semantic_hash": "cb1ef314e865a96534254c0ead9dd69f"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/main.ts": {
+    "mtime": 1785827159.1029947,
+    "ast_hash": "84b1b644855034c5d943993304d36118",
+    "semantic_hash": "84b1b644855034c5d943993304d36118"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/metadata/metadata.controller.ts": {
+    "mtime": 1785827796.2137768,
+    "ast_hash": "283f6a30385fc8137d4579b79f576bb6",
+    "semantic_hash": "283f6a30385fc8137d4579b79f576bb6"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/actions.controller.ts": {
+    "mtime": 1785831726.1781032,
+    "ast_hash": "c18a3ba17b6cceee713251d325190db0",
+    "semantic_hash": "c18a3ba17b6cceee713251d325190db0"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/leads.controller.ts": {
+    "mtime": 1785831477.2772965,
+    "ast_hash": "59777d3d18707ac34568ca35f1de6b7b",
+    "semantic_hash": "59777d3d18707ac34568ca35f1de6b7b"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/meta.controller.ts": {
+    "mtime": 1785830288.4474828,
+    "ast_hash": "71fb82e3fc988ab63bdbc94ee74a4724",
+    "semantic_hash": "71fb82e3fc988ab63bdbc94ee74a4724"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/meta.module.ts": {
+    "mtime": 1785829887.2447731,
+    "ast_hash": "d51afe342592b5d260103802349db124",
+    "semantic_hash": "d51afe342592b5d260103802349db124"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/sync.module.ts": {
+    "mtime": 1785829850.9361663,
+    "ast_hash": "71ce845b2300ac0c16b34de71d702a84",
+    "semantic_hash": "71ce845b2300ac0c16b34de71d702a84"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/team.controller.ts": {
+    "mtime": 1785830257.9029717,
+    "ast_hash": "fb8c603eeaf67b799b1625db5c3c53ab",
+    "semantic_hash": "fb8c603eeaf67b799b1625db5c3c53ab"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/sync/team.module.ts": {
+    "mtime": 1785829887.1567717,
+    "ast_hash": "eb268b8b2f63136e230a75670c614370",
+    "semantic_hash": "eb268b8b2f63136e230a75670c614370"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/whatsapp/broadcasts.controller.ts": {
+    "mtime": 1785836706.600657,
+    "ast_hash": "b0cb03e4310f8620672de431c71c1e0d",
+    "semantic_hash": "b0cb03e4310f8620672de431c71c1e0d"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/whatsapp/inbox.controller.ts": {
+    "mtime": 1785836642.9557817,
+    "ast_hash": "e99ab79e4ade0f336ae5e59b982bf997",
+    "semantic_hash": "e99ab79e4ade0f336ae5e59b982bf997"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/whatsapp/templates.controller.ts": {
+    "mtime": 1785835142.558726,
+    "ast_hash": "6a50facbb46a590dcd65d9c8983efdfc",
+    "semantic_hash": "6a50facbb46a590dcd65d9c8983efdfc"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/src/whatsapp/whatsapp.module.ts": {
+    "mtime": 1785835248.810509,
+    "ast_hash": "12be8a701ba87ca52b73df58c7a827dc",
+    "semantic_hash": "12be8a701ba87ca52b73df58c7a827dc"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/tsconfig.json": {
+    "mtime": 1785827256.476651,
+    "ast_hash": "35e42f40e9c7b7da5aaad483e24b06f0",
+    "semantic_hash": "35e42f40e9c7b7da5aaad483e24b06f0"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/api/vitest.contract.config.ts": {
+    "mtime": 1785827219.4240212,
+    "ast_hash": "ec6e8c193a3237a4b226096598a38508",
+    "semantic_hash": "ec6e8c193a3237a4b226096598a38508"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/mcp/dev.sh": {
+    "mtime": 1785828638.7799444,
+    "ast_hash": "d99e229776a6a024207ab9aa596f0dbf",
+    "semantic_hash": "d99e229776a6a024207ab9aa596f0dbf"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/mcp/package.json": {
+    "mtime": 1785828555.2585416,
+    "ast_hash": "e62d3904b358c751d3684f5c58378560",
+    "semantic_hash": "e62d3904b358c751d3684f5c58378560"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/mcp/src/index.ts": {
+    "mtime": 1785829031.610526,
+    "ast_hash": "21115549dea34800ad3c114839a80dd0",
+    "semantic_hash": "21115549dea34800ad3c114839a80dd0"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/mcp/tsconfig.json": {
+    "mtime": 1785828420.5522788,
+    "ast_hash": "c17e974a7a6e9ec8f9a07d71fc9a9f98",
+    "semantic_hash": "c17e974a7a6e9ec8f9a07d71fc9a9f98"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/package.json": {
+    "mtime": 1785834923.487281,
+    "ast_hash": "248c1060a02a79d713f046a3e7327ee3",
+    "semantic_hash": "248c1060a02a79d713f046a3e7327ee3"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/cli/pair.ts": {
+    "mtime": 1785840531.709504,
+    "ast_hash": "47fb2638b30620489728a1c52842bc83",
+    "semantic_hash": "47fb2638b30620489728a1c52842bc83"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/inbox.service.ts": {
+    "mtime": 1785835954.415108,
+    "ast_hash": "3fcfd9619ff6a758d87493ce6117e694",
+    "semantic_hash": "3fcfd9619ff6a758d87493ce6117e694"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/index.ts": {
+    "mtime": 1785836335.411683,
+    "ast_hash": "21cd5c9c4bde05957265e1f00469b354",
+    "semantic_hash": "21cd5c9c4bde05957265e1f00469b354"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/providers/baileys.provider.ts": {
+    "mtime": 1785840543.4577456,
+    "ast_hash": "b25d4bd03f5968573422645a38019036",
+    "semantic_hash": "b25d4bd03f5968573422645a38019036"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/providers/mock.provider.ts": {
+    "mtime": 1785834535.3084164,
+    "ast_hash": "d989ff5a2c5f0599da3155fdaa853704",
+    "semantic_hash": "d989ff5a2c5f0599da3155fdaa853704"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/src/sessions.ts": {
+    "mtime": 1785836274.2709024,
+    "ast_hash": "53187e2462007d1a7f25829cd56f67f4",
+    "semantic_hash": "53187e2462007d1a7f25829cd56f67f4"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/services/whatsapp/tsconfig.json": {
+    "mtime": 1785834516.5120838,
+    "ast_hash": "4088c6051f1b4c466d59af986cd469bb",
+    "semantic_hash": "4088c6051f1b4c466d59af986cd469bb"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/tsconfig.base.json": {
+    "mtime": 1785826067.8684974,
+    "ast_hash": "da9f4e4f3d670345c17c522c9314ece1",
+    "semantic_hash": "da9f4e4f3d670345c17c522c9314ece1"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/turbo.json": {
+    "mtime": 1785826067.8284965,
+    "ast_hash": "e5bce670112249e4d61bed0daf8d4c6d",
+    "semantic_hash": "e5bce670112249e4d61bed0daf8d4c6d"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/ARCHITECTURE.md": {
+    "mtime": 1785829001.5260284,
+    "ast_hash": "bfc8514d84a3dae4c31658e9a0a74b4f",
+    "semantic_hash": "bfc8514d84a3dae4c31658e9a0a74b4f"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/DECISIONS.md": {
+    "mtime": 1785829011.114187,
+    "ast_hash": "9b023333073431d3a6957f903f4dda0b",
+    "semantic_hash": "9b023333073431d3a6957f903f4dda0b"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/LICENSES.md": {
+    "mtime": 1785829001.490028,
+    "ast_hash": "4f592b8dcb5816c4c939a9ef0311fff7",
+    "semantic_hash": "4f592b8dcb5816c4c939a9ef0311fff7"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/PARITY.md": {
+    "mtime": 1785836974.5644085,
+    "ast_hash": "9806b663533cca5fe5e1aed87a8c2dfe",
+    "semantic_hash": "9806b663533cca5fe5e1aed87a8c2dfe"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/PLAN-P1.md": {
+    "mtime": 1785836999.2607586,
+    "ast_hash": "39904c1a3700b3bf212a585b6671ede3",
+    "semantic_hash": "39904c1a3700b3bf212a585b6671ede3"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/docs/RISKS.md": {
+    "mtime": 1785829037.0346158,
+    "ast_hash": "61309aebe7b607f59825385574c97af7",
+    "semantic_hash": "61309aebe7b607f59825385574c97af7"
+  },
+  "/mnt/data/Projects/ByteCodeCRM/pnpm-workspace.yaml": {
+    "mtime": 1785826067.6604936,
+    "ast_hash": "05ecf780f2b6473113ab8e9c2fac19b8",
+    "semantic_hash": "05ecf780f2b6473113ab8e9c2fac19b8"
+  }
+}
