@@ -1,0 +1,20 @@
+meta {
+  name: 72 - WhatsApp templates
+  type: http
+  seq: 72
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/whatsapp/templates
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+}

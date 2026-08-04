@@ -6,12 +6,15 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema.js';
+import * as whatsappSchema from './whatsapp-schema.js';
 import { setTenantContext } from './rls.js';
+
+export type DbSchema = typeof schema & typeof whatsappSchema;
 
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
-let db: NodePgDatabase<typeof schema> | null = null;
+let db: NodePgDatabase<DbSchema> | null = null;
 
 export function getConnectionString(): string {
   return (
@@ -27,14 +30,14 @@ export function getPool(): pg.Pool {
   return pool;
 }
 
-export function getDb(): NodePgDatabase<typeof schema> {
+export function getDb(): NodePgDatabase<DbSchema> {
   if (!db) {
-    db = drizzle(getPool(), { schema });
+    db = drizzle(getPool(), { schema: { ...schema, ...whatsappSchema } }) as NodePgDatabase<DbSchema>;
   }
   return db;
 }
 
-export type DbClient = NodePgDatabase<typeof schema>;
+export type DbClient = NodePgDatabase<DbSchema>;
 
 /**
  * Run `fn` inside a transaction scoped to `enterpriseId`.
@@ -48,7 +51,7 @@ export async function withTenant<T>(
   try {
     await client.query('BEGIN');
     await client.query('SELECT set_config($1, $2, true)', ['app.enterprise_id', enterpriseId]);
-    const tx = drizzle(client, { schema });
+    const tx = drizzle(client, { schema: { ...schema, ...whatsappSchema } }) as DbClient;
     const result = await fn(tx);
     await client.query('COMMIT');
     return result;
@@ -61,4 +64,5 @@ export async function withTenant<T>(
 }
 
 export * from './schema.js';
-export { enableRls, setTenantContext } from './rls.js';
+export * from './whatsapp-schema.js';
+export { enableRls, setTenantContext, ALL_TENANT_TABLES } from './rls.js';

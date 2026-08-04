@@ -1,0 +1,20 @@
+meta {
+  name: 70 - WhatsApp conversations
+  type: http
+  seq: 70
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/whatsapp/conversations
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@opentelecrm/db",
+  "name": "@opentelecrm/whatsapp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,23 +15,21 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "generate": "drizzle-kit generate --config=./src/drizzle.config.ts",
-    "migrate": "tsx src/migrate.ts",
-    "seed": "tsx src/seed.ts",
-    "test": "echo \"db: no tests yet\""
+    "test": "vitest run",
+    "pair": "tsx src/cli/pair.ts"
   },
   "dependencies": {
-    "@opentelecrm/core-domain": "workspace:*",
-    "@types/pg": "^8.20.3",
-    "drizzle-kit": "^0.30.2",
+    "@opentelecrm/contracts": "workspace:*",
+    "@opentelecrm/db": "workspace:*",
+    "@whiskeysockets/baileys": "^6.7.0",
+    "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.4",
-    "pg": "^8.22.0",
-    "postgres": "^3.4.5",
     "tsx": "^4.19.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
   }
 }

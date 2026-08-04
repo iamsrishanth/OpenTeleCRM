@@ -7,9 +7,10 @@ import { AsyncModule } from './async/async.module.js';
 import { TeamModule } from './sync/team.module.js';
 import { MetaModule } from './sync/meta.module.js';
 import { SyncModule } from './sync/sync.module.js';
+import { WhatsappModule } from './whatsapp/whatsapp.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule],
+  imports: [DatabaseModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule],
   controllers: [HealthController, MetadataController],
 })
 export class AppModule {}

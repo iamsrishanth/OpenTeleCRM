@@ -1,0 +1,28 @@
+meta {
+  name: 71 - WhatsApp send (mock)
+  type: http
+  seq: 71
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/whatsapp/send
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "contactJid": "919876543210@s.whatsapp.net",
+    "text": "Hello from the Bruno collection!"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.messageId: defined
+}

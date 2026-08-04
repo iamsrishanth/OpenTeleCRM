@@ -19,6 +19,7 @@ import {
   teamMember,
   user,
 } from './schema.js';
+import { conversation, waMessage, waTemplate, waSession } from './whatsapp-schema.js';
 
 const LEAD_COUNT = 5_000;
 const CUSTOM_FIELDS = 20;
@@ -158,6 +159,70 @@ async function main() {
       process.stdout.write(`\rseeded ${Math.min(i + BATCH, LEAD_COUNT)}/${LEAD_COUNT} leads`);
     }
     process.stdout.write('\n');
+
+    // 8. WhatsApp demo (P2): one agent session, one template, one conversation
+    //    with a couple of inbound/outbound messages so the inbox has data.
+    const [waSessionRow] = await db
+      .insert(waSession)
+      .values({
+        enterpriseId: eid,
+        screenName: 'demo-agent-number',
+        status: 'ready',
+      })
+      .returning();
+    if (!waSessionRow) throw new Error('wa_session insert returned no row');
+
+    await db
+      .insert(waTemplate)
+      .values({
+        enterpriseId: eid,
+        name: 'welcome_message',
+        status: 'APPROVED',
+        category: 'MARKETING',
+        languageCode: 'en',
+        body: 'Hi {{1}}, thanks for reaching out to Acme! How can we help today?',
+        footer: 'Reply STOP to opt out.',
+      })
+      .execute();
+
+    const [convo] = await db
+      .insert(conversation)
+      .values({
+        enterpriseId: eid,
+        waSessionId: waSessionRow.id,
+        contactJid: '919876543210@s.whatsapp.net',
+        contactName: 'Demo Customer',
+        lastMessageAt: new Date(),
+        unreadCount: 1,
+      })
+      .returning();
+    if (!convo) throw new Error('conversation insert returned no row');
+
+    await db
+      .insert(waMessage)
+      .values([
+        {
+          enterpriseId: eid,
+          conversationId: convo.id,
+          waMessageId: 'seed-msg-1',
+          direction: 'inbound',
+          type: 'text',
+          body: 'Hi, I saw your ad on Facebook. Is the 2BHK still available?',
+          status: 'received',
+          sentAt: new Date(Date.now() - 1000 * 60 * 5),
+        },
+        {
+          enterpriseId: eid,
+          conversationId: convo.id,
+          waMessageId: 'seed-msg-2',
+          direction: 'outbound',
+          type: 'text',
+          body: 'Hi Demo Customer! Yes it is. Would you like to schedule a site visit?',
+          status: 'sent',
+          sentAt: new Date(Date.now() - 1000 * 60 * 4),
+        },
+      ])
+      .execute();
   });
 
   console.log(
