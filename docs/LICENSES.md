@@ -99,7 +99,7 @@ between major versions (Redis is the canonical example below).
 | **Loki** | 3.x | AGPL-3.0 | strong | ⚠️ | Grafana Labs, AGPL like Grafana. Same caveat: internal logs, not an end-user surface. Alternative: **GlitchTip (BSD-3)** |
 | **GlitchTip** | 17.x | BSD-3-Clause | permissive | ✅ | Error tracking; the BSD-3 alternative to Sentry's SSPL |
 | **Uptime Kuma** | 1.x | MIT | permissive | ✅ | Status monitoring |
-| **Baileys** | latest (6.x) | MIT | permissive | ✅ | WhatsApp library for the `whatsapp` service |
+| **whatsapp-web.js** | 1.34.7 | Apache-2.0 | permissive | ✅ | WhatsApp library for the `whatsapp` service |
 | **faster-whisper** | 1.x | MIT | permissive | ✅ | ASR / transcription for the `ai` service |
 | **Piper** | 1.x | MIT | permissive | ✅ | TTS voice generation |
 | **LiveKit** | 1.x | Apache-2.0 | permissive | ✅ | WebRTC voice/video if used |

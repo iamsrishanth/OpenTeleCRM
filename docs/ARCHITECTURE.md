@@ -99,7 +99,7 @@ flowchart LR
 
 - `contracts` (`packages/contracts`) — shared zod schemas for async/sync API bodies — **implemented** (WhatsApp P2 + telephony P3 provider surfaces).
 - `rule-engine` (`packages/rule-engine`) — lead routing / assignment logic.
-- `connectors` (`packages/connectors`) — WhatsApp (Baileys), telephony adapters.
+- `connectors` (`packages/connectors`) — WhatsApp (whatsapp-web.js), telephony adapters.
 - `whatsapp`, `automation` (Temporal), `analytics` (ClickHouse), `ai`, `notifier` —
   future service containers (see L2 dashed boxes). `telephony` shipped its P3 slice
   (mock + asterisk-ari providers, dialer scoring) — live Asterisk wiring is next
@@ -367,7 +367,7 @@ Wire-compat is enforced today at the **contract test** layer
 
 | Container | Tech | Notes |
 |-----------|------|-------|
-| `whatsapp` | Node + Baileys | Inbound/outbound WhatsApp across tenants |
+| `whatsapp` | Node + whatsapp-web.js (Puppeteer) | Inbound/outbound WhatsApp across tenants |
 | `telephony` | Asterisk / PSTN adapters | Call state, dial-out, recording — P3 slice shipped (`TelephonyProvider` contract, mock + ARI providers, dialer scoring, calls/caller-id/dialer/callbacks/recordings API); live ARI wiring next (see PLAN-P3.md) |
 | `automation` | **Temporal** | Async job execution, workflows, retries |
 | `analytics` | **ClickHouse** | Reporting over lead/action/audit data |

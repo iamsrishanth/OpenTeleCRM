@@ -57,6 +57,6 @@ Per-vertical-slice: pg_dump pre-migration backup; additive-only migrations; feat
 5. T7 lead list + search + import/export UI
 ## P2 Status — WhatsApp (committed 85272d1)
 
-**Shipped:** `packages/contracts` (WhatsAppProvider interface), `packages/db` whatsapp-schema + migration 0001 + RLS, `services/whatsapp` (mock + Baileys drivers, InboxService with auto lead-attribution, lazy session manager, pairing CLI), `services/api` WhatsApp controllers (inbox conversations/messages/send, templates CRUD, broadcasts create/start/opt-out).
+**Shipped:** `packages/contracts` (WhatsAppProvider interface), `packages/db` whatsapp-schema + migration 0001 + RLS, `services/whatsapp` (mock + whatsapp-web.js drivers, InboxService with auto lead-attribution, lazy session manager, pairing CLI), `services/api` WhatsApp controllers (inbox conversations/messages/send, templates CRUD, broadcasts create/start/opt-out).
 **Verified:** 43/43 contract tests, 17/17 Bruno requests green.
-**Remaining P2:** live pairing (`pnpm --filter @opentelecrm/whatsapp pair` with a real phone), cloud-api driver (Meta Graph), chatbot flow builder + LLM fallback, widget SDK, agent notifications, broadcast throttle/jitter in the Baileys driver.
+**Remaining P2:** live pairing (`pnpm --filter @opentelecrm/whatsapp pair` with a real phone), cloud-api driver (Meta Graph), chatbot flow builder + LLM fallback, widget SDK, agent notifications, broadcast throttle/jitter in the wwebjs driver.

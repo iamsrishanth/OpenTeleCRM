@@ -23,7 +23,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 | [ADR-0012](#adr-0012-authorization-openfga--postgres-rls) | Authorization: OpenFGA + Postgres RLS | Accepted (RLS implemented) |
 | [ADR-0013](#adr-0013-reverse-proxy-caddy) | Reverse proxy: Caddy | Accepted (planned) |
 | [ADR-0014](#adr-0014-feature-flags-unleash-all-on-by-default) | Feature flags: Unleash, all-on by default | Accepted (planned) |
-| [ADR-0015](#adr-0015-whatsapp-baileys--waha-with-cloud-api-driver) | WhatsApp: Baileys/WAHA + Cloud API driver | Accepted (planned) |
+| [ADR-0015](#adr-0015-whatsapp-whatsapp-webjs--cloud-api-driver) | WhatsApp: whatsapp-web.js + Cloud API driver | Accepted (planned) |
 | [ADR-0016](#adr-0016-speech-to-text-faster-whisper--pyannote) | Speech-to-text: faster-whisper + pyannote | Accepted (planned) |
 | [ADR-0017](#adr-0017-voice-agent-livekit) | Voice agent: LiveKit | Accepted (planned) |
 | [ADR-0018](#adr-0018-text-to-speech-piper--coqui-xtts-opt-in) | Text-to-speech: Piper (Coqui XTTS opt-in) | Accepted (planned) |
@@ -31,7 +31,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 | [ADR-0020](#adr-0020-etl-node-red-optional-n8n-excluded) | ETL: Node-RED optional (n8n excluded) | Accepted (planned) |
 | [ADR-0021](#adr-0021-bi-echarts-metabase-excluded) | BI: ECharts (Metabase excluded) | Accepted (planned) |
 | [ADR-0022](#adr-0022-payments-hyperswitch) | Payments: Hyperswitch | Accepted (planned) |
-| [ADR-0023](#adr-0023-web-nextjs-15--react-19--shadcnui) | Web: Next.js 15 + React 19 + shadcn/ui | Accepted (planned) |
+| [ADR-0023](#adr-0023-web-nextjs-15--react-19--shadcnui) | Web: Next.js 16 + React 19 + shadcn/ui | Accepted (planned) |
 | [ADR-0024](#adr-0024-mobile-react-native--watermelondb--ntfy) | Mobile: React Native + WatermelonDB + ntfy | Accepted (planned) |
 | [ADR-0025](#adr-0025-dev-auth-dev-jwt-secret--zitadel-in-prod) | Dev auth: `DEV_JWT_SECRET`, Zitadel in prod | Accepted (implemented) |
 | [ADR-0026](#adr-0026-telephony-asterisk--ari) | Telephony: Asterisk + ARI (chan_pjsip, Stasis `opentelecrm`) | Accepted (partial: provider scaffold + PBX config) |
@@ -315,19 +315,19 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ---
 
-## ADR-0015: WhatsApp: Baileys/WAHA + Cloud API driver
+## ADR-0015: WhatsApp: whatsapp-web.js + Cloud API driver
 
 **Status:** Accepted (planned).
 
-**Context:** TeleCRM's core channel is WhatsApp messaging. Options for self-hosted WhatsApp integration: unofficial libraries (Baileys) vs a gateway (WAHA) vs Meta's official Cloud API. This carries real ToS/ban risk — see RISKS.md.
+**Context:** TeleCRM's core channel is WhatsApp messaging. Options for self-hosted WhatsApp integration: unofficial libraries (whatsapp-web.js) vs a gateway (WAHA) vs Meta's official Cloud API. This carries real ToS/ban risk — see RISKS.md.
 
 **Decision:** Dual-driver architecture behind a `services/whatsapp` abstraction:
 
 - **Default driver: Meta Cloud API** (official, ToS-compliant, per-message fees — see RISKS.md) for production.
-- **Alternative driver: Baileys/WAHA** (unofficial, self-hosted) for low-volume/air-gapped deployments where the operator accepts ToS risk — with a **mandatory consent modal** at first WhatsApp-feature use (per-enterprise acknowledgment of ToS/ban risk, stored in audit log).
+- **Alternative driver: whatsapp-web.js** (unofficial, self-hosted, Apache-2.0; drives WhatsApp Web through Puppeteer) for low-volume/air-gapped deployments where the operator accepts ToS risk — with a **mandatory consent modal** at first WhatsApp-feature use (per-enterprise acknowledgment of ToS/ban risk, stored in audit log).
 - Driver selection is per-enterprise configuration, never baked into business logic.
 
-**Alternatives:** Baileys-only (ToS-violating by default — rejected as default); Cloud-API-only (fees + internet dependency conflict with air-gap requirement); twilio WhatsApp (vendor lock + fees).
+**Alternatives:** whatsapp-web.js-only (ToS-violating by default — rejected as default); Cloud-API-only (fees + internet dependency conflict with air-gap requirement); twilio WhatsApp (vendor lock + fees); Baileys (WebSocket driver — rejected: heavier ESM interop surface, no maintained Chrome-free deployment story on this stack).
 
 **Consequences:**
 
@@ -468,13 +468,13 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ---
 
-## ADR-0023: Web: Next.js 15 + React 19 + shadcn/ui
+## ADR-0023: Web: Next.js 16 + React 19 + shadcn/ui
 
 **Status:** Accepted (planned — `apps/web` scaffold exists).
 
 **Context:** The agent/desk web app (leads grid, call pad, dashboards, workflow builder) must match TeleCRM's UX density with a modern, maintainable stack, and share UI primitives with the monorepo.
 
-**Decision:** **Next.js 15 (App Router) + React 19 + TypeScript**, with **shadcn/ui** (MIT, Radix-based, copy-in components) as the component layer, styled via Tailwind. Server Components for read paths, client components for the call pad/workflow canvas. Monorepo UI primitives in `packages/ui`.
+**Decision:** **Next.js 16 (App Router, actual pinned 16.3.0) + React 19 + TypeScript**, with **shadcn/ui** (MIT, Radix-based, copy-in components) as the component layer, styled via Tailwind. Server Components for read paths, client components for the call pad/workflow canvas. Monorepo UI primitives in `packages/ui`.
 
 **Alternatives:** Vite + React SPA (fine, but loses SSR/SEO and route conventions; API prefix parity is simpler in Next); Remix (React Router-based, smaller ecosystem for this stack); plain shadcn-less Tailwind (reinventing component quality).
 

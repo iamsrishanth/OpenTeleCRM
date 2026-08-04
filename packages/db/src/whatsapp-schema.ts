@@ -23,7 +23,7 @@ const withTimestamps = {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 };
 
-/** A WhatsApp Web multi-device session for one agent number (Baileys state). */
+/** A WhatsApp Web multi-device session for one agent number (whatsapp-web.js state). */
 export const waSession = pgTable(
   'wa_session',
   {
@@ -35,7 +35,7 @@ export const waSession = pgTable(
     status: varchar('status', { length: 32 }).default('connecting').notNull(),
     /** QR code payload for the current pairing attempt (cleared after ready). */
     qrCode: text('qr_code'),
-    /** Base64/JSON session creds (Baileys multi-device state); encrypted at rest in prod. */
+    /** Base64/JSON session creds (whatsapp-web.js multi-device state); encrypted at rest in prod. */
     creds: jsonb('creds').$type<Record<string, unknown>>(),
     authVersion: integer('auth_version').default(1),
     lastPairedAt: timestamp('last_paired_at', { withTimezone: true }),

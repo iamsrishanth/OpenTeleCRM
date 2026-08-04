@@ -7,7 +7,7 @@
 | REST API | ✅ 62/62 tests | NestJS + Fastify on port 3005 |
 | JSON-RPC MCP | ✅ 13 tools | Streamable HTTP on port 3006 |
 | Bruno collection | ✅ 27 reqs, 58 assertions | TeleCRM wire-compatible |
-| WhatsApp | ✅ Baileys driver | Pairing-code auth, templates, broadcasts |
+| WhatsApp | ✅ wwebjs driver | Pairing-code auth, templates, broadcasts |
 | Telephony | ✅ Dialer + callbacks | OSS provider on Asterisk |
 
 ---
@@ -49,7 +49,7 @@ opentelecrm/
 ├── services/
 │   ├── api/          # NestJS REST API  (Fastify, port 3005)
 │   ├── mcp/          # JSON-RPC MCP     (Express, port 3006)
-│   └── whatsapp/     # WhatsApp driver  (Baileys, pairing-code)
+│   └── whatsapp/     # WhatsApp driver  (whatsapp-web.js, pairing-code)
 ├── packages/
 │   └── db/           # Drizzle schema, RLS, migrations, seed data
 ├── apps/
@@ -112,7 +112,7 @@ Tests spin up the real API (dev JWT + seeded DB), hit `authGuard` + RLS — no m
 - **DB** — PostgreSQL 16, Drizzle ORM + Drizzle Kit, native RLS
 - **Auth** — HS256 JWTs + SHA-256 API tokens + Zitadel OIDC (future)
 - **Deps** — TypeScript 5.7, Biome 1.9, Vitest
-- **WhatsApp** — @whiskeysockets/baileys, pairing-code auth
+- **WhatsApp** — whatsapp-web.js (wwebjs), pairing-code auth
 - **Infra** — Native Debian 13, systemd units, no Docker
 
 ---

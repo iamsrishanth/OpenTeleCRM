@@ -17,6 +17,7 @@ build/
 .next/
 .turbo/
 coverage/
+graphify-out/
 
 # --- Local data ---
 data/
@@ -36,3 +37,7 @@ logs/
 # --- Infra runtime ---
 infra/docker/volumes/
 .data/
+
+# --- Build artifacts (tracked by accident) ---
+*.tsbuildinfo
+*.js.map

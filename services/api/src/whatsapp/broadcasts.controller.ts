@@ -38,9 +38,9 @@ type RecipientsJson = Record<string, unknown>[];
  *   GET  /enterprise/{eid}/whatsapp/broadcasts
  *   POST /enterprise/{eid}/whatsapp/broadcasts          create draft + resolve recipients
  *   POST /enterprise/{eid}/whatsapp/broadcasts/:id/start  send sequentially via mock provider
- *   POST /enterprise/{eid}/whatsapp/broadcasts/:id/optimout  opt-out one recipient (consent ledger)
+ *   POST /enterprise/{eid}/whatsapp/broadcasts/:id/optout  opt-out one recipient (consent ledger)
  *   GET  /enterprise/{eid}/whatsapp/broadcasts/:id
- * Real throttle/jitter lives in the Baileys driver — this path sends eagerly.
+ * Real throttle/jitter lives in the wwebjs driver — this path sends eagerly.
  */
 @Controller('enterprise/:eid/whatsapp/broadcasts')
 export class BroadcastsController {
@@ -190,7 +190,7 @@ export class BroadcastsController {
         .returning();
       if (!sending) throw new Error('broadcast start update returned no row');
 
-      // Mock-driver path: send eagerly (no throttle/jitter — that lives in Baileys).
+      // Mock-driver path: send eagerly (no throttle/jitter — that lives in wwebjs).
       const agentSessionKey = `${eid}:mock`;
       const provider = await providerFor(agentSessionKey, 'mock');
       await provider.connect(agentSessionKey);
@@ -234,8 +234,8 @@ export class BroadcastsController {
     return { success: true, delivered: result.delivered, failed: result.failed, data: this.serialize(result.row) };
   }
 
-  @Post(':id/optimout')
-  async optimout(
+  @Post(':id/optout')
+  async optout(
     @Param('eid') eid: string,
     @Param('id') id: string,
     @Body() body: { contactJid?: string },

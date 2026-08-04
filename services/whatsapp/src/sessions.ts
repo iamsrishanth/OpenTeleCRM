@@ -2,10 +2,10 @@
  * WhatsApp session manager — owns provider lifecycle per agent session.
  * Map<agentSessionId, WhatsAppProvider>.
  *
- * The Baileys driver is loaded LAZILY via dynamic import: the API process
- * (mock path) must never pull @whiskeysockets/baileys into memory — its ESM
- * interop (named `proto` export) breaks when loaded from the Nest app. Only
- * the pairing CLI / a real-number worker imports it directly.
+ * The whatsapp-web.js driver is loaded LAZILY via dynamic import: the API
+ * process (mock path) must never pull puppeteer/whatsapp-web.js into memory —
+ * it would spawn a headless Chrome per request. Only the pairing CLI / a
+ * real-number worker imports it directly.
  */
 import type { WhatsAppProvider } from '@opentelecrm/contracts';
 import { MockWhatsAppProvider } from './providers/mock.provider.js';
@@ -14,15 +14,15 @@ const sessions = new Map<string, WhatsAppProvider>();
 
 export async function providerFor(
   agentSessionId: string,
-  kind: 'mock' | 'baileys' | 'cloud-api' = 'mock',
+  kind: 'mock' | 'wwebjs' | 'cloud-api' = 'mock',
 ): Promise<WhatsAppProvider> {
   const existing = sessions.get(agentSessionId);
   if (existing) return existing;
 
   let provider: WhatsAppProvider;
-  if (kind === 'baileys') {
-    const { BaileysWhatsAppProvider } = await import('./providers/baileys.provider.js');
-    provider = new BaileysWhatsAppProvider();
+  if (kind === 'wwebjs') {
+    const { WWebJsWhatsAppProvider } = await import('./providers/wwebjs.provider.js');
+    provider = new WWebJsWhatsAppProvider();
   } else {
     provider = new MockWhatsAppProvider();
   }

@@ -1,26 +1,29 @@
 /**
- * WhatsApp pairing CLI — boots a real Baileys session and pairs via a
- * PAIRING CODE (no QR scan needed).
+ * WhatsApp pairing CLI — boots a real whatsapp-web.js session and pairs.
+ *
+ * Two auth paths (whatsapp-web.js supports both):
+ *   --code <phone>  request a PAIRING CODE (type it in the phone's
+ *                   "Linked devices" screen). e.g. --code 918465067156
+ *   (no --code)     display a QR CODE in the terminal; scan it from the
+ *                   phone's "Linked devices" > "Link a device".
  *
  * Usage:
- *   pnpm --filter @opentelecrm/whatsapp pair -- --code <full-international-phone>
- *   e.g. pnpm --filter @opentelecrm/whatsapp pair -- --code 918465067156
+ *   pnpm --filter @opentelecrm/whatsapp pair -- --code 918465067156
+ *   pnpm --filter @opentelecrm/whatsapp pair                # QR mode
  *
- * Session id used is "cli". Credentials persist to .data/baileys/cli.json via
- * the FileCredentialStore, so once paired the API/worker can reuse the session
- * without re-pairing.
+ * Session id used is "cli". whatsapp-web.js LocalAuth persists the Chrome
+ * profile + session under .data/wwebjs/cli/, so once paired the API/worker
+ * can reuse the session without re-pairing.
  *
  * IMPORTANT: the pairing code is requested ONCE and kept stable. Do NOT
  * re-request it on reconnect — a fresh request invalidates the previous code,
- * and the user can't type it that fast. The code stays valid server-side for
- * ~1 minute after request; we just hold the socket and wait for 'ready'.
+ * and the user can't type it that fast.
  */
-import { BaileysWhatsAppProvider } from '../providers/baileys.provider.js';
-import { ensureStoreDir, sessionFileFor } from '../providers/credential-store.js';
-import { writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { WWebJsWhatsAppProvider } from '../providers/wwebjs.provider.js';
+import qrcode from 'qrcode-terminal';
 
-const LINK_TIMEOUT_MS = 180_000; // 3 min wait for the link after code shown
+const LINK_TIMEOUT_MS = 180_000; // 3 min wait for the link after QR/code shown
 const SESSION_ID = 'cli';
 
 function argValue(name: string): string | undefined {
@@ -28,157 +31,86 @@ function argValue(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+function ensureStoreDir(): void {
+  const root = process.env.OPENTELECRM_DATA_DIR ?? `${process.cwd()}/.data`;
+  mkdirSync(`${root}/wwebjs`, { recursive: true });
+}
+
+function sessionDir(): string {
+  const root = process.env.OPENTELECRM_DATA_DIR ?? `${process.cwd()}/.data`;
+  return `${root}/wwebjs/${SESSION_ID}`;
+}
+
 async function main(): Promise<void> {
   const phone = argValue('--code') ?? process.env.WA_PAIR_PHONE;
-  if (!phone) {
-    console.error(
-      'Usage: pnpm --filter @opentelecrm/whatsapp pair -- --code <full-international-phone>\n' +
-        '  e.g. --code 918465067156   (no +, no spaces)',
-    );
-    process.exit(1);
-  }
 
   ensureStoreDir();
-  console.log('[pair] booting Baileys WhatsApp provider...');
-  console.log(`[pair] session id: ${SESSION_ID} → creds file: ${sessionFileFor(SESSION_ID)}`);
-  console.log(`[pair] pairing via code for phone: ${phone}`);
-  const provider = new BaileysWhatsAppProvider();
+  console.log('[pair] booting whatsapp-web.js provider...');
+  console.log(`[pair] session id: ${SESSION_ID} → session dir: ${sessionDir()}`);
+  if (phone) {
+    console.log(`[pair] pairing via code for ${phone} (type code in "Linked devices")`);
+  } else {
+    console.log('[pair] QR mode — scan the QR below with WhatsApp > Linked devices > Link a device');
+  }
 
-  // No QR rendering in pairing-code mode.
-  const unsubQr = provider.onQr(() => {});
+  const provider = new WWebJsWhatsAppProvider();
+  let qrShown = false;
 
-  const showCode = (code: string): void => {
-    const pretty = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
-    console.log('\n' + '='.repeat(60));
-    console.log('   PAIRING CODE — enter this in WhatsApp on your phone:');
-    console.log('   Settings > Linked devices > Link with phone number');
-    console.log('='.repeat(60));
-    console.log('');
-    console.log(`        ${pretty}`);
-    console.log('');
-    console.log('='.repeat(60) + '\n');
-    try {
-      const txtPath = sessionFileFor(SESSION_ID).replace(/\.json$/, '-pairing-code.txt');
-      writeFileSync(txtPath, `${pretty}\n`, { mode: 0o600 });
-      console.log(`[pair] code also saved to: ${txtPath}`);
-      spawnSync('notify-send', ['WhatsApp Pairing Code', pretty], { stdio: 'ignore', timeout: 3_000 });
-    } catch {
-      /* best-effort */
-    }
-  };
-
-  // 1) Connect.
-  const initial = await provider.connect(SESSION_ID);
-  console.log(`[pair] connect → ${initial.status}`);
-
-  // 2) Wait for the QR event — per Baileys docs, the pairing code must be
-  //    requested only AFTER the socket enters registration mode (signalled by
-  //    the QR event). Requesting it earlier hits the server at the wrong phase
-  //    and the connection gets dropped.
-  const qrReady = new Promise<void>((resolve) => {
-    const unsub = provider.onQr(() => {
-      unsub();
-      resolve();
-    });
-    // socket may already be in registration mode with a QR emitted before we
-    // subscribed — bail out after a short grace period if the QR never comes.
-    setTimeout(() => {
-      unsub();
-      resolve();
-    }, 15_000);
+  // Surf the provider's pairing signals to the console.
+  provider.on('status', (status) => {
+    if (typeof status !== 'string') return;
+    console.log(`[pair] status: ${status}`);
   });
-  await qrReady;
 
-  // 3) Request the pairing code ONCE. Retry the request itself a few times if
-  //    the socket needs a moment, but never re-request after it succeeds.
-  let pairingCode: string | null = null;
-  for (let attempt = 0; attempt < 10 && !pairingCode; attempt++) {
-    try {
-      pairingCode = await provider.requestPairingCode(SESSION_ID, phone);
-    } catch (err) {
-      console.error(
-        `[pair] code request failed (${attempt + 1}/10):`,
-        err instanceof Error ? err.message : err,
-      );
-      await new Promise((r) => setTimeout(r, 3_000));
-    }
-  }
-  if (!pairingCode) {
-    console.error('[pair] could not obtain a pairing code — giving up');
-    process.exit(1);
-  }
-  showCode(pairingCode);
+  // The provider emits 'qr'/'code' on its own EventEmitter — surface them via
+  // a tiny relay so the CLI sees them (events are private to the provider).
+  // Re-hook by wrapping on(): the provider's on() only exposes message/status,
+  // so we instead rely on sessionStatus polling + the QR captured there.
+  const status = await provider.connect(SESSION_ID);
+  console.log(`[pair] initial status: ${status.status}`);
 
-  // 3) Hold and wait for the link. If the socket drops, the server-side
-  //    pairing session dies with it — so on reconnect we must request a
-  //    FRESH code (the old one is invalid). Loop until linked or deadline.
+  if (phone) {
+    const code = await provider.requestPairingCode(SESSION_ID, phone);
+    console.log(`[pair] pairing code: ${code}`);
+    console.log('[pair] WhatsApp phone → Settings → Linked devices → Link a device → Link with phone number instead.');
+  }
+
+  // Poll sessionStatus for QR / ready transitions.
   const deadline = Date.now() + LINK_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const outcome = await new Promise<'ready' | 'down' | 'timeout'>((resolve) => {
-      let done = false;
-      const finish = (v: 'ready' | 'down' | 'timeout'): void => {
-        if (!done) {
-          done = true;
-          resolve(v);
-        }
-      };
-      const unsub = provider.on('status', (status) => {
-        console.log(`[pair] status -> ${status}`);
-        if (status === 'ready') finish('ready');
-        else if (status === 'dead' || status === 'disconnected') finish('down');
-      });
-      // give the socket a moment to settle before declaring idle
-      const timer = setTimeout(() => finish('timeout'), 20_000);
-      provider.isOnline(SESSION_ID).then((ok) => {
-        if (ok) finish('ready');
-      });
-      // cleanup not strictly needed — this promise resolves exactly once
-      void unsub;
-      void timer;
-    });
-    if (outcome === 'ready') {
-      console.log('[pair] linked successfully ✔');
-      break;
-    }
-    if (outcome === 'down') {
-      console.log(`[pair] socket dropped — reconnecting and refreshing code (${Math.round((deadline - Date.now()) / 1000)}s left)`);
+    const s = await provider.sessionStatus(SESSION_ID);
+
+    if (s.status === 'paired' && s.qrCode && !qrShown) {
+      qrShown = true;
+      console.log('[pair] scanning QR...');
       try {
-        await provider.connect(SESSION_ID);
-      } catch (err) {
-        console.error('[pair] reconnect failed:', err instanceof Error ? err.message : err);
-        await new Promise((r) => setTimeout(r, 3_000));
-        continue;
-      }
-      // Wait for registration mode again, then request a fresh code.
-      const qrAgain = new Promise<void>((resolve) => {
-        const unsub2 = provider.onQr(() => {
-          unsub2();
-          resolve();
+        qrcode.generate(s.qrCode, { small: true }, (qrOut: string) => {
+          console.log(qrOut);
         });
-        setTimeout(() => {
-          unsub2();
-          resolve();
-        }, 15_000);
-      });
-      await qrAgain;
-      try {
-        pairingCode = await provider.requestPairingCode(SESSION_ID, phone);
-        showCode(pairingCode);
       } catch (err) {
-        console.error('[pair] refresh code failed:', err instanceof Error ? err.message : err);
+        console.error('[pair] could not render QR:', err);
       }
-    } else {
-      console.log(`[pair] waiting for link... (${Math.round((deadline - Date.now()) / 1000)}s left)`);
-      await new Promise((r) => setTimeout(r, 5_000));
     }
+
+    if (s.status === 'ready') {
+      console.log(`[pair] linked! screenName: ${s.screenName ?? 'unknown'}`);
+      console.log('[pair] session saved — API/worker can reuse it.');
+      process.exit(0);
+    }
+
+    if (s.status === 'dead') {
+      console.error('[pair] auth failed / session logged out. Re-run to re-pair.');
+      process.exit(1);
+    }
+
+    await new Promise((r) => setTimeout(r, 1500));
   }
 
-  unsubQr();
-  await provider.disconnect(SESSION_ID);
-  console.log('[pair] done');
+  console.error(`[pair] timed out after ${LINK_TIMEOUT_MS / 1000}s — no link.`);
+  process.exit(1);
 }
 
 main().catch((err) => {
-  console.error('[pair] failed:', err);
+  console.error('[pair] fatal:', err);
   process.exit(1);
 });

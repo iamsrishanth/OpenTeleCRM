@@ -61,12 +61,12 @@ export interface WhatsAppSessionStatus {
 }
 
 /**
- * The provider boundary. Every driver (mock, Baileys/WAHA unofficial-web,
- * Meta cloud-api) implements this exactly. Drivers handle their own transport,
- * session persistence and reconnect; the domain layer only sees this surface.
+ * The provider boundary. Every driver (mock, whatsapp-web.js, Meta cloud-api)
+ * implements this exactly. Drivers handle their own transport, session
+ * persistence and reconnect; the domain layer only sees this surface.
  */
 export interface WhatsAppProvider {
-  readonly kind: 'mock' | 'baileys' | 'cloud-api';
+  readonly kind: 'mock' | 'wwebjs' | 'cloud-api';
   readonly ownsSession: boolean;
 
   /** Connect + begin processing this number's session. Resolves a session status. */

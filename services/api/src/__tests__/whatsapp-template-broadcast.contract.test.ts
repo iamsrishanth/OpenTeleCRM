@@ -173,7 +173,7 @@ describe('WhatsApp broadcasts (mock driver)', () => {
     const contactJid = created.data.recipients[0]!.jid;
     const broadcastId: string = created.data.id;
 
-    const opt = await fetch(`${base}${broadcastsPath(ENTERPRISE_ID)}/${broadcastId}/optimout`, {
+    const opt = await fetch(`${base}${broadcastsPath(ENTERPRISE_ID)}/${broadcastId}/optout`, {
       method: 'POST',
       headers: { ...authHeaders(), 'content-type': 'application/json' },
       body: JSON.stringify({ contactJid }),
