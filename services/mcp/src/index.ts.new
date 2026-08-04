@@ -1,0 +1,302 @@
+/**
+ * OpenTeleCRM MCP server — TeleCRM tool parity.
+ *
+ * Surface: 13 tools with TeleCRM-identical names & schemas (plus the P0
+ * vertical: list_lead_fields). Every tool resolves its enterprise from the
+ * request context and reads through withTenant(), so Postgres RLS scopes all
+ * queries. No cross-tenant leakage by construction.
+ *
+ * Auth note: this build runs in dev mode with the enterprise taken from
+ * env (MCP_ENTERPRISE_ID). The OAuth 2.1 + PKCE + Dynamic Client
+ * Registration gateway (Zitadel) lands in the auth phase — the tool surface
+ * below is transport-agnostic and works behind any MCP auth layer.
+ *
+ * Transport: Streamable HTTP (POST /mcp, SSE responses).
+ */
+import 'dotenv/config';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
+import { eq, sql, and } from 'drizzle-orm';
+import {
+  getDb,
+  withTenant,
+  lead,
+  leadField,
+  action,
+  actionType,
+  enterprise,
+  pipeline,
+  stage,
+  lostReason,
+  teamMember,
+  user,
+} from '@opentelecrm/db';
+import type { DbClient } from '@opentelecrm/db';
+import http from 'node:http';
+
+const PORT = Number(process.env.MCP_PORT ?? 3100);
+const ENTERPRISE_ID = process.env.MCP_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
+
+const server = new McpServer({
+  name: 'opentelecrm',
+  version: '0.1.0',
+});
+
+// ---- helpers ------------------------------------------------------------
+
+async function tenant<T>(fn: (db: DbClient) => Promise<T>): Promise<T> {
+  return withTenant(ENTERPRISE_ID, fn);
+}
+
+function leadToPlain(row: typeof lead.$inferSelect) {
+  return {
+    id: row.id,
+    identifier: row.identifier,
+    source: row.source,
+    score: row.score,
+    tags: row.tags,
+    customFields: row.customFields,
+    ownerUserId: row.ownerUserId,
+    pipelineId: row.pipelineId,
+    stageId: row.stageId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+// ---- tools (TeleCRM parity) --------------------------------------------
+
+  { inputSchema: {
+  },
+  async () => {
+    const ent = await tenant(async (db) =>
+      db.select().from(enterprise).where(eq(enterprise.id, ENTERPRISE_ID)).limit(1),
+    );
+    const e = ent[0];
+    if (!e) return { content: [{ type: 'text', text: JSON.stringify({ error: 'enterprise_not_found' }) }] };
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            id: e.id,
+            name: e.name,
+            leadIdentifier: e.leadIdentifier,
+            timezone: e.timezone,
+            locale: e.locale,
+          }),
+        },
+      ],
+    };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ includeArchived }) => {
+    const fields = await tenant(async (db) =>
+      db
+        .select()
+        .from(leadField)
+        .where(includeArchived ? undefined : sql`archived_at IS NULL`),
+    );
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            fields.map((f) => ({
+              apiName: f.apiName,
+              label: f.label,
+              type: f.type,
+              required: f.required,
+              unique: f.unique,
+              config: f.config,
+            })),
+          ),
+        },
+      ],
+    };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ apiName }) => {
+    const fields = await tenant(async (db) =>
+      db.select().from(leadField).where(and(eq(leadField.apiName, apiName), sql`archived_at IS NULL`)),
+    );
+    const f = fields[0];
+    if (!f) return { content: [{ type: 'text', text: JSON.stringify({ error: 'field_not_found' }) }] };
+    return { content: [{ type: 'text', text: JSON.stringify({ apiName: f.apiName, type: f.type, config: f.config }) }] };
+  },
+);
+
+server.registerTool(
+  'list_actions',
+  {},
+    const types = await tenant(async (db) => db.select().from(actionType));
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            types.map((t) => ({ code: t.code, name: t.name, isSystem: t.isSystem, fieldSchema: t.fieldSchema })),
+          ),
+        },
+      ],
+    };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ code }) => {
+    const types = await tenant(async (db) => db.select().from(actionType).where(eq(actionType.code, code)));
+    const t = types[0];
+    if (!t) return { content: [{ type: 'text', text: JSON.stringify({ error: 'action_type_not_found' }) }] };
+    return { content: [{ type: 'text', text: JSON.stringify({ code: t.code, name: t.name, fieldSchema: t.fieldSchema }) }] };
+  },
+);
+
+server.registerTool(
+  'get_lead_stages_and_lost_reasons',
+  {},
+    const result = await tenant(async (db) => {
+      const pipes = await db.select().from(pipeline);
+      const stages = await db.select().from(stage);
+      const reasons = await db.select().from(lostReason);
+      return { pipes, stages, reasons };
+    });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            pipelines: result.pipes.map((p) => ({
+              id: p.id,
+              name: p.name,
+              stages: result.stages.filter((s) => s.pipelineId === p.id).map((s) => ({ id: s.id, name: s.name, order: s.order })),
+            })),
+            lostReasons: result.reasons.map((r) => ({ id: r.id, label: r.label })),
+          }),
+        },
+      ],
+    };
+  },
+);
+
+server.registerTool(
+  'list_team_members',
+  {},
+    const members = await tenant(async (db) => {
+      const tms = await db.select().from(teamMember);
+      const users = await db.select().from(user);
+      return tms.map((tm) => {
+        const u = users.find((x) => x.id === tm.userId);
+        return { id: tm.id, email: u?.email, name: u?.name, availability: tm.availabilityState, shift: tm.shift, skills: tm.skills };
+      });
+    });
+    return { content: [{ type: 'text', text: JSON.stringify(members) }] };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ leadId }) => {
+    const rows = await tenant(async (db) => db.select().from(lead).where(eq(lead.id, leadId)).limit(1));
+    const row = rows[0];
+    if (!row) return { content: [{ type: 'text', text: JSON.stringify({ error: 'lead_not_found' }) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(leadToPlain(row)) }] };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ identifier, source, limit = 10 }) => {
+    const rows = await tenant(async (db) => {
+      const conds: ReturnType<typeof sql>[] = [];
+      if (identifier) conds.push(sql`identifier = ${identifier}`);
+      if (source) conds.push(sql`source = ${source}`);
+      const where = conds.length ? sql`${sql.join(conds, sql` AND `)}` : undefined;
+      return db.select().from(lead).where(where).limit(limit);
+    });
+    return { content: [{ type: 'text', text: JSON.stringify(rows.map(leadToPlain)) }] };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ actionId }: { actionId: string }) => {
+    const rows = await tenant(async (db) => db.select().from(action).where(eq(action.id, actionId)).limit(1));
+    const row = rows[0];
+    if (!row) return { content: [{ type: 'text', text: JSON.stringify({ error: 'action_not_found' }) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(row) }] };
+  },
+);
+
+  { inputSchema: {
+  },
+  async ({ leadId, limit = 10 }: { leadId: string; limit?: number }) => {
+    const rows = await tenant(async (db) => db.select().from(action).where(eq(action.leadId, leadId)).limit(limit));
+    return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+  },
+);
+
+server.registerTool('get_current_date', {}, async () => {
+  return { content: [{ type: 'text', text: JSON.stringify({ date: new Date().toISOString() }) }] };
+});
+
+server.registerTool(
+  'get_workspace_context',
+  {},
+    const result = await tenant(async (db) => {
+      const pipes = await db.select().from(pipeline);
+      const fields = await db.select().from(leadField).where(sql`archived_at IS NULL`);
+      return { pipes, fields };
+    });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            pipelines: result.pipes.map((p: { name: string }) => p.name),
+            fields: result.fields.map((f: { apiName: string }) => f.apiName),
+          }),
+        },
+      ],
+    };
+  },
+);
+
+// ---- HTTP transport -----------------------------------------------------
+
+const httpServer = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
+  // CORS for MCP clients
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+  await server.connect(transport);
+
+  await transport.handleRequest(req, res, req.headers);
+  // For long-lived sessions, transport.close() is managed by the SDK.
+  if (!transport.sessionId) {
+    await server.close();
+  }
+});
+
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`OpenTeleCRM MCP server listening on http://0.0.0.0:${PORT}/mcp`);
+  console.log(`Enterprise scope: ${ENTERPRISE_ID}`);
+});

@@ -1,0 +1,25 @@
+{
+  "name": "@opentelecrm/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "test": "echo \"mcp: no tests yet\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "@opentelecrm/db": "workspace:*",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.38.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  }
+}

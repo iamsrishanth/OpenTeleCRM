@@ -1,0 +1,13 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    include: ['src/__tests__/**/*.contract.test.ts'],
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    env: {
+      PORT: '3100',
+      API_BASE_PATH: '/autoupdate/v2',
+    },
+  },
+});
