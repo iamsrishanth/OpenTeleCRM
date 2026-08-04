@@ -175,6 +175,80 @@ describe('Sync POST /enterprise/:eid/lead/search', () => {
       expect(row.identifier).toContain('91');
     }
   });
+
+  it('searches by stageId eq against the real column', async () => {
+    // Fetch a real pipeline/stage from the seeded enterprise.
+    const pipeRes = await fetch(
+      `${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead-stage-pipeline`,
+      { headers: headers() },
+    );
+    expect(pipeRes.status).toBe(200);
+    const pipeBody = await pipeRes.json();
+    const firstPipe = pipeBody.data[0];
+    expect(firstPipe).toBeTruthy();
+    const stageId: string = firstPipe.stages[0]?.id;
+    expect(stageId).toBeTruthy();
+
+    const identifier = '91' + unique();
+    const createRes = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ identifier, pipelineId: firstPipe.id, stageId, score: 90 }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.status).toBe('CREATED');
+
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead/search`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        filters: [{ field: 'stageId', op: 'eq', value: stageId }],
+        skip: 0,
+        limit: 25,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const found = body.data.find((r: { id: string }) => r.id === created.id);
+    expect(found).toBeTruthy();
+    expect(found.stageId).toBe(stageId);
+    // Every hit must actually live in that stage — proves the real column, not custom_fields.
+    for (const row of body.data) {
+      expect(row.stageId).toBe(stageId);
+    }
+  });
+
+  it('searches by score gt against the real column', async () => {
+    const identifier = '91' + unique();
+    const createRes = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ identifier, score: 90 }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.status).toBe('CREATED');
+
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead/search`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        filters: [{ field: 'score', op: 'gt', value: 75 }],
+        skip: 0,
+        limit: 25,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const found = body.data.find((r: { id: string }) => r.id === created.id);
+    expect(found).toBeTruthy();
+    expect(found.score).toBe(90);
+    // Numeric comparison on the real score column — excludes nulls and low scores.
+    for (const row of body.data) {
+      expect(row.score).toBeGreaterThan(75);
+    }
+  });
 });
 
 describe('Sync actions batch', () => {

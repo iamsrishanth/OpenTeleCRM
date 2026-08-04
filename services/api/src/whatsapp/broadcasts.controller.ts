@@ -8,6 +8,7 @@ import { consentLedger, lead, waBroadcast, waSession, waTemplate } from '@opente
 import { providerFor } from '@opentelecrm/whatsapp';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -47,6 +48,7 @@ export class BroadcastsController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -166,6 +168,16 @@ export class BroadcastsController {
       return created;
     });
 
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'broadcast.created',
+      resourceType: 'wa_broadcast',
+      resourceId: row.id,
+      after: this.serialize(row),
+    });
+
     return { data: this.serialize(row), status: 'CREATED' };
   }
 
@@ -231,6 +243,16 @@ export class BroadcastsController {
       return { row: done, delivered, failed };
     });
 
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'broadcast.started',
+      resourceType: 'wa_broadcast',
+      resourceId: id,
+      after: this.serialize(result.row),
+    });
+
     return { success: true, delivered: result.delivered, failed: result.failed, data: this.serialize(result.row) };
   }
 
@@ -273,6 +295,18 @@ export class BroadcastsController {
 
       return updated;
     });
+
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'broadcast.optout',
+      resourceType: 'wa_broadcast',
+      resourceId: id,
+      before: { contactJid },
+      after: this.serialize(row),
+    });
+
     return { data: this.serialize(row), status: 'OPTED_OUT' };
   }
 

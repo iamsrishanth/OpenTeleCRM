@@ -17,6 +17,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { action, actionType, enterprise, lead, leadField } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -70,6 +71,7 @@ export class AsyncController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -267,6 +269,15 @@ export class AsyncController {
       createdAt: Date.now(),
     };
     ingestLedger.set(requestId, record);
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'async.ingested',
+      resourceType: 'ingest',
+      resourceId: requestId,
+      after: { requestId, status: 'queued' },
+    });
     void this.processIngest(eid, payload.fields, payload.actions, fieldResults, actionResults, record);
     return { success: true, requestId, message: 'queued' };
   }

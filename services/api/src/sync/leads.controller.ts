@@ -6,6 +6,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { lead, leadField } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -58,6 +59,7 @@ export class LeadsController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -73,20 +75,49 @@ export class LeadsController {
     return new HttpException({ error: { code, message } }, HttpStatus.NOT_FOUND);
   }
 
-  // value expression for a filter column — identifier/source map to real columns,
-  // anything else is treated as a custom field inside the custom_fields jsonb.
+  // value expression for a filter column — structural lead fields map to real
+  // columns; anything else is treated as a custom field inside the custom_fields jsonb.
   private valExpr(field: string): SQL {
     const f = field.toLowerCase();
     if (f === 'identifier') return sql`identifier`;
     if (f === 'source') return sql`"source"`;
+    if (f === 'pipelineid') return sql`pipeline_id`;
+    if (f === 'stageid') return sql`stage_id`;
+    if (f === 'score') return sql`score`;
+    if (f === 'tags') return sql`tags`;
+    if (f === 'lostreasonid') return sql`lost_reason_id`;
+    if (f === 'owneruserid') return sql`owner_user_id`;
     return sql`custom_fields->>${field}`;
   }
 
   private condition(f: SearchFilter) {
+    const field = f.field.toLowerCase();
     const expr = this.valExpr(f.field);
+
+    // tags is a jsonb array column — needs containment semantics, not text extraction.
+    if (field === 'tags') {
+      switch (f.op) {
+        case 'eq':
+        case 'in':
+          return Array.isArray(f.value)
+            ? sql`tags ?| ${f.value as string[]}`
+            : sql`tags ? ${String(f.value)}`;
+        case 'contains':
+          return sql`tags::text ilike ${'%' + String(f.value) + '%'}`;
+        case 'isNull':
+          return sql`tags IS NULL`;
+        default:
+          return sql`1=1`;
+      }
+    }
+
     switch (f.op) {
       case 'eq':
-        return sql`lower(${expr}) = lower(${f.value as string})`;
+        // case-insensitive only for textual columns (identifier/source parity)
+        if (field === 'identifier' || field === 'source') {
+          return sql`lower(${expr}) = lower(${f.value as string})`;
+        }
+        return sql`${expr} = ${f.value}`;
       case 'contains':
         return sql`${expr} ilike ${'%' + String(f.value) + '%'}`;
       case 'gt':
@@ -178,6 +209,16 @@ export class LeadsController {
 
       if (existing[0]) {
         await db.update(lead).set(base).where(eq(lead.id, existing[0].id));
+        await this.auditService.record({
+          enterpriseId: eid,
+          actorUserId: req.auth?.userId,
+          actorTokenId: req.auth?.apiTokenId,
+          action: 'lead.updated',
+          resourceType: 'lead',
+          resourceId: existing[0].id,
+          before: existing[0],
+          after: { ...existing[0], ...base },
+        });
         return {
           status: 'UPDATED',
           leadId: existing[0].id,
@@ -200,6 +241,15 @@ export class LeadsController {
         .values({ enterpriseId: eid, ...base })
         .returning({ id: lead.id });
       const lid = inserted[0]!.id;
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'lead.created',
+        resourceType: 'lead',
+        resourceId: lid,
+        after: { id: lid, ...base },
+      });
       return {
         status: 'CREATED',
         leadId: lid,
@@ -274,6 +324,16 @@ export class LeadsController {
       if (dto.tags !== undefined) set.tags = dto.tags;
 
       await db.update(lead).set(set).where(eq(lead.id, leadId));
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'lead.updated',
+        resourceType: 'lead',
+        resourceId: leadId,
+        before: existing[0],
+        after: { ...existing[0], ...set },
+      });
       return { status: 'UPDATED', leadId, id: leadId, fields };
     });
   }
@@ -285,6 +345,15 @@ export class LeadsController {
       const existing = await db.select().from(lead).where(eq(lead.id, leadId)).limit(1);
       if (!existing[0]) throw this.notFound('LEAD_NOT_FOUND', 'Lead not found');
       await db.delete(lead).where(eq(lead.id, leadId));
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'lead.deleted',
+        resourceType: 'lead',
+        resourceId: leadId,
+        before: existing[0],
+      });
     });
     return { success: true };
   }

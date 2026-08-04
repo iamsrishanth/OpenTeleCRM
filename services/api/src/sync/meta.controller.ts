@@ -17,6 +17,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { actionType, leadField } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -35,6 +36,7 @@ export class MetaController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -97,6 +99,15 @@ export class MetaController {
       }
       return created;
     });
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'custom_action.created',
+      resourceType: 'custom_action',
+      resourceId: created.id,
+      after: this.toDto(created),
+    });
     return { data: this.toDto(created), status: 'CREATED' };
   }
 
@@ -128,7 +139,18 @@ export class MetaController {
         })
         .where(eq(actionType.id, row.id))
         .returning();
-      return rows[0] ?? row;
+      const after = rows[0] ?? row;
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'custom_action.updated',
+        resourceType: 'custom_action',
+        resourceId: row.id,
+        before: row,
+        after,
+      });
+      return after;
     });
     return { data: this.toDto(updated), status: 'UPDATED' };
   }
@@ -161,7 +183,18 @@ export class MetaController {
         })
         .where(eq(leadField.id, row.id))
         .returning();
-      return rows[0] ?? row;
+      const after = rows[0] ?? row;
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'custom_field.updated',
+        resourceType: 'custom_field',
+        resourceId: row.id,
+        before: row,
+        after,
+      });
+      return after;
     });
     return {
       data: {

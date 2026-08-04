@@ -37,7 +37,7 @@ import http from 'node:http';
 const PORT = Number(process.env.MCP_PORT ?? 3101);
 const ENTERPRISE_ID = process.env.MCP_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
 
-const server = new McpServer({
+export const server = new McpServer({
   name: 'opentelecrm',
   version: '0.1.0',
 });
@@ -260,7 +260,11 @@ const httpServer = http.createServer(async (req: http.IncomingMessage, res: http
   }
 });
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`OpenTeleCRM MCP server listening on http://0.0.0.0:${PORT}/mcp`);
-  console.log(`Enterprise scope: ${ENTERPRISE_ID}`);
-});
+// Don't auto-listen when imported by tests: vitest sets VITEST, and the
+// contract test boots its own transport on a test port against `server`.
+if (!process.env.VITEST) {
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`OpenTeleCRM MCP server listening on http://0.0.0.0:${PORT}/mcp`);
+    console.log(`Enterprise scope: ${ENTERPRISE_ID}`);
+  });
+}

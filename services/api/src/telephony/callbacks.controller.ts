@@ -6,6 +6,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { callback, lead } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 import { resolveCallbackDue } from './callback-time.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
@@ -34,6 +35,7 @@ export class CallbacksController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -104,6 +106,15 @@ export class CallbacksController {
         })
         .returning();
       if (!row) throw new Error('callback insert returned no row');
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'callback.created',
+        resourceType: 'callback',
+        resourceId: row.id,
+        after: { id: row.id, leadId, dueAt: row.dueAt.toISOString(), status: row.status },
+      });
       return { id: row.id, dueAt: row.dueAt.toISOString(), status: row.status };
     });
   }
@@ -173,6 +184,16 @@ export class CallbacksController {
         .update(callback)
         .set({ status, completedAt: status === 'done' ? new Date() : null })
         .where(eq(callback.id, id));
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'callback.updated',
+        resourceType: 'callback',
+        resourceId: id,
+        before: existing[0],
+        after: { id, status, completedAt: status === 'done' ? new Date() : null },
+      });
       return { id, status };
     });
   }

@@ -6,6 +6,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { action, actionType, lead, user } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -47,6 +48,7 @@ export class ActionsController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -162,6 +164,23 @@ export class ActionsController {
         actionIds = await db.insert(action).values(todos).returning({ id: action.id });
       }
 
+      // One audit row per successfully created action.
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i]!;
+        const createdId = actionIds[i]?.id;
+        if (r.status === 'CREATED' && createdId) {
+          await this.auditService.record({
+            enterpriseId: eid,
+            actorUserId: actorUserId ?? undefined,
+            actorTokenId: req.auth?.apiTokenId,
+            action: 'action.created',
+            resourceType: 'action',
+            resourceId: createdId,
+            after: { leadId, actionTypeId: r.typeId, note: todos[i]?.note ?? null },
+          });
+        }
+      }
+
       const data = results.map((r, i) => {
         const actionId = r.status === 'CREATED' ? actionIds[i]?.id ?? '' : '';
         return { actionId, id: actionId, typeId: r.typeId, status: r.status, remarks: r.remarks };
@@ -203,6 +222,16 @@ export class ActionsController {
       if (dto.note !== undefined) set.note = dto.note ?? null;
       await db.update(action).set(set).where(eq(action.id, actionId));
       const updated = await db.select().from(action).where(eq(action.id, actionId)).limit(1);
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'action.updated',
+        resourceType: 'action',
+        resourceId: actionId,
+        before: existing[0],
+        after: updated[0],
+      });
       return this.serialize(updated[0]!);
     });
   }
@@ -219,6 +248,15 @@ export class ActionsController {
       const existing = await db.select().from(action).where(eq(action.id, actionId)).limit(1);
       if (!existing[0]) throw this.notFound('ACTION_NOT_FOUND', 'Action not found');
       await db.delete(action).where(eq(action.id, actionId));
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'action.deleted',
+        resourceType: 'action',
+        resourceId: actionId,
+        before: existing[0],
+      });
     });
     return { success: true };
   }

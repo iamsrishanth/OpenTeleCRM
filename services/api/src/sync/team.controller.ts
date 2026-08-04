@@ -17,6 +17,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { role, teamMember, user } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -40,6 +41,7 @@ export class TeamController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -125,7 +127,20 @@ export class TeamController {
         .set({ availabilityState: body.state })
         .where(and(eq(teamMember.enterpriseId, eid), eq(teamMember.id, tm.id)))
         .returning();
-      return rows[0];
+      const after = rows[0];
+      if (after) {
+        await this.auditService.record({
+          enterpriseId: eid,
+          actorUserId: req.auth?.userId,
+          actorTokenId: req.auth?.apiTokenId,
+          action: 'team_member.state_changed',
+          resourceType: 'team_member',
+          resourceId: after.id,
+          before: { availabilityState: tm.availabilityState },
+          after,
+        });
+      }
+      return after;
     });
     return {
       data: {
@@ -253,6 +268,25 @@ export class TeamController {
       return { tm: tm!, createdUser, email, name: body.name.trim(), roleName: roleRow.name, roleKind: roleRow.kind };
     });
 
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: result.createdUser ? 'team_member.created' : 'team_member.updated',
+      resourceType: 'team_member',
+      resourceId: result.tm.id,
+      after: {
+        id: result.tm.id,
+        email: result.email,
+        name: result.name,
+        roleName: result.roleName,
+        roleKind: result.roleKind,
+        availabilityState: result.tm.availabilityState,
+        shift: result.tm.shift,
+        skills: result.tm.skills ?? [],
+      },
+    });
+
     const dto = {
       id: result.tm.id,
       email: result.email,
@@ -303,7 +337,18 @@ export class TeamController {
         })
         .where(and(eq(teamMember.enterpriseId, eid), eq(teamMember.id, existing.id)))
         .returning();
-      return rows[0] ?? existing;
+      const after = rows[0] ?? existing;
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId: req.auth?.userId,
+        actorTokenId: req.auth?.apiTokenId,
+        action: 'team_member.updated',
+        resourceType: 'team_member',
+        resourceId: after.id,
+        before: existing,
+        after,
+      });
+      return after;
     });
     return {
       data: {

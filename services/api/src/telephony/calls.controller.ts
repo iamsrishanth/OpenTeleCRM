@@ -18,6 +18,7 @@ import { action, actionType, call, lead } from '@opentelecrm/db';
 import type { CallDirection, CallDisposition, CallStatus } from '@opentelecrm/contracts';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -76,6 +77,7 @@ export class CallsController {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -188,6 +190,16 @@ export class CallsController {
         }
       }
       return inserted;
+    });
+
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'call.created',
+      resourceType: 'call',
+      resourceId: row.id,
+      after: this.serialize(row),
     });
 
     return this.serialize(row);

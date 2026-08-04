@@ -18,6 +18,7 @@ import { z } from 'zod';
 import type { FastifyRequest } from 'fastify';
 import { apiToken, type DbClient } from '@opentelecrm/db';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
 import type { AuthContext } from './auth.guard.js';
 import { TokenService } from './token.service.js';
 
@@ -42,6 +43,7 @@ export class TokenController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(TokenService) private readonly tokenService: TokenService,
+    @Inject(AuditService) private readonly auditService: AuditService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -70,6 +72,15 @@ export class TokenController {
     const [row] = await this.withTenant(eid, (db) =>
       db.select().from(apiToken).where(eq(apiToken.tokenHash, hash)).limit(1),
     );
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'token.created',
+      resourceType: 'api_token',
+      resourceId: row?.id,
+      after: { name, type, expiresAt: row?.expiresAt ?? null },
+    });
     return { data: { rawToken, tail, name, type, expiresAt: row?.expiresAt ?? null } };
   }
 
@@ -118,6 +129,15 @@ export class TokenController {
     if (!row) {
       throw new NotFoundException({ error: { code: 'NOT_FOUND', message: 'Token not found' } });
     }
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId: req.auth?.userId,
+      actorTokenId: req.auth?.apiTokenId,
+      action: 'token.revoked',
+      resourceType: 'api_token',
+      resourceId: tokenId,
+      after: { id: row.id, revokedAt: row.revokedAt },
+    });
     return { data: { id: row.id, revokedAt: row.revokedAt } };
   }
 }
