@@ -1,0 +1,36 @@
+meta {
+  name: 30 - Batch create actions
+  type: http
+  seq: 30
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/lead/{{leadId}}/action
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "actions": [
+      { "type": "note", "note": "hello from bruno" },
+      { "type": "call", "payload": { "disposition": "no_answer" } }
+    ]
+  }
+}
+
+script:post-response {
+  const data = res.body.data;
+  if (Array.isArray(data) && data[0]) {
+    bru.setEnvVar('actionId', data[0].id);
+  }
+}
+
+assert {
+  res.status: eq 201
+}

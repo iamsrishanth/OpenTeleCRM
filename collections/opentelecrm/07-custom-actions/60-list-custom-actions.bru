@@ -1,0 +1,20 @@
+meta {
+  name: 60 - List custom actions
+  type: http
+  seq: 60
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/custom-actions
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+}

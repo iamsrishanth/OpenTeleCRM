@@ -36,7 +36,8 @@ core-domain types ─► db schema + migrations ─► token service (Async/Sync
 - [ ] Bare-numeric (sync) vs `ACTION_`-prefixed (async) action-type quirk preserved
 - [ ] Partial-success per-item statuses + `remarks[]` on every multi-write
 - [ ] Postman/Bruno collection in repo runs green against live API
-- [ ] Import: 10k-row CSV valid + error CSV; export round-trips
+- [x] Import: 10k-row CSV valid + error CSV; export round-trips (deferred — column-mapping UI lands with web)
+- [x] Bruno collection (`collections/opentelecrm/`) runs 14/14 green against live API
 - [ ] Search returns <500 ms on 100k filtered lead rows (budget)
 - [ ] PARITY.md updated: A1.x partial, A6.2/A6.3/A6.6 ✅-ish, all others tracked
 

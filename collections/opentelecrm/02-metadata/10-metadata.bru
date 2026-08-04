@@ -1,0 +1,21 @@
+meta {
+  name: 10 - Workspace metadata
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/metadata
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.enterprise.id: eq {{enterpriseId}}
+  res.body.enterprise.leadIdentifier: eq phone
+}

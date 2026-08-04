@@ -1,0 +1,32 @@
+meta {
+  name: 22 - Search leads (contains)
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/lead/search
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filters": [
+      { "field": "identifier", "op": "contains", "value": "91" }
+    ],
+    "skip": 0,
+    "limit": 10
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+  res.body.total: defined
+}

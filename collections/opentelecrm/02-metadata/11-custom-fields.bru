@@ -1,0 +1,20 @@
+meta {
+  name: 11 - Custom fields
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/custom-fields
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+}

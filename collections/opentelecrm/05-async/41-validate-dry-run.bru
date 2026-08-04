@@ -1,0 +1,31 @@
+meta {
+  name: 41 - Async validate=true dry-run
+  type: http
+  seq: 41
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/autoupdatelead?validate=true
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fields": {
+      "phone": "+919****5432",
+      "nope_unknown_field": "should-be-rejected"
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.validated: eq true
+  res.body.fields: defined
+}

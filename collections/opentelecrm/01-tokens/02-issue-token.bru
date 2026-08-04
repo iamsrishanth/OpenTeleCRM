@@ -1,0 +1,39 @@
+meta {
+  name: 02 - Issue API token (sync)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/api-tokens
+  body: json
+  auth: bearer
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "bruno-collection-sync",
+    "type": "sync"
+  }
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+script:post-response {
+  const data = res.body.data;
+  if (data && data.rawToken) {
+    bru.setEnvVar('apiToken', data.rawToken);
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.data.rawToken: defined
+}

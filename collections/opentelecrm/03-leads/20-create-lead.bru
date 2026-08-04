@@ -1,0 +1,39 @@
+meta {
+  name: 20 - Create lead
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/lead
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "identifier": "+919876543210",
+    "source": "bruno-collection",
+    "score": 42,
+    "tags": ["hot"],
+    "customFields": {
+      "custom_01": 1001
+    }
+  }
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && (data.id || data.leadId)) {
+    bru.setEnvVar('leadId', data.id || data.leadId);
+  }
+}
+
+assert {
+  res.status: eq 201
+}

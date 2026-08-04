@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "name": "OpenTeleCRM — TeleCRM Parity Collection",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

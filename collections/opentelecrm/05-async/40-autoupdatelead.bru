@@ -1,0 +1,34 @@
+meta {
+  name: 40 - Async autoupdatelead (queued)
+  type: http
+  seq: 40
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/autoupdatelead
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "fields": {
+      "phone": "+919****4321",
+      "custom_01": 777
+    },
+    "actions": [
+      { "type": "ACTION_note", "note": "async ingestion" }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.success: eq true
+  res.body.requestId: defined
+}

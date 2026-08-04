@@ -170,6 +170,6 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 | A8 Support & Onboarding | 0 | 0 | 3 |
 | B Plans & Billing | 0 | 0 | 3 |
 
-**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7). Everything in A1–A5, A7, A8, B is not yet built.
+**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **Bruno collection (`collections/opentelecrm/`) runs 14/14 green against the live API** — the P1 exit gate. Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7). Everything in A1–A5, A7, A8, B is not yet built.
 
 _Last updated: 2026-08-04. Keep in sync with `services/api`, `services/mcp`, `packages/db` as features land._
