@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import jwt from 'jsonwebtoken';
 import type { FastifyRequest } from 'fastify';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
+import { TokenService } from './token.service.js';
 
 export interface AuthContext {
   /** Enterprise id the token is scoped to. */
@@ -32,6 +32,8 @@ export class AuthGuard implements CanActivate {
   // directly; avoids DI resolution quirks under tsx/Fastify.
   private reflector = new Reflector();
 
+  constructor(private readonly tokenService: TokenService) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -56,31 +58,8 @@ export class AuthGuard implements CanActivate {
   }
 
   private async resolve(token: string): Promise<AuthContext> {
-    // 1) API token (TeleCRM-style): format `telekrm_async_<uuid>` / `telekrm_sync_<uuid>`.
-    if (token.startsWith('tele')) {
-      return { enterpriseId: token, tokenType: 'token' };
-    }
-    // 2) Dev JWT (HS256) in local/dev mode.
-    const devSecret = process.env.DEV_JWT_SECRET;
-    if (devSecret) {
-      try {
-        const payload = jwt.verify(token, devSecret) as { enterpriseId: string; sub?: string };
-        return { enterpriseId: payload.enterpriseId, userId: payload.sub, tokenType: 'dev-jwt' };
-      } catch {
-        // not a dev JWT — fall through
-      }
-    }
-    // 3) Zitadel OIDC id-token (RS256, issuer-checked).
-    if (process.env.ZITADEL_ISSUER) {
-      try {
-        const payload = jwt.decode(token) as { enterpriseId?: string; sub?: string };
-        if (payload?.enterpriseId) {
-          return { enterpriseId: payload.enterpriseId, userId: payload.sub, tokenType: 'oidc' };
-        }
-      } catch {
-        /* fall through */
-      }
-    }
-    throw new UnauthorizedException({ error: { code: 'NOT_AUTHORIZED', message: 'Invalid or expired token' } });
+    // Resolution lives in TokenService: API token (telekrm_ sha256 lookup),
+    // dev JWT (DEV_JWT_SECRET), or Zitadel OIDC id-token.
+    return this.tokenService.resolveToken(token);
   }
 }
