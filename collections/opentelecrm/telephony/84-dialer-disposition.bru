@@ -1,0 +1,38 @@
+meta {
+  name: 84 - Dialer disposition (converted)
+  type: http
+  seq: 84
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/dialer/{{dialerLeadId}}/disposition
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "disposition": "converted",
+    "durationSec": 90,
+    "talkSec": 75,
+    "callbackIn": "1h",
+    "callbackNote": "call back"
+  }
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && data.callbackId) {
+    bru.setEnvVar('callbackId', data.callbackId);
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.callId: defined
+}

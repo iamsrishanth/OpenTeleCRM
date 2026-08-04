@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "generate": "drizzle-kit generate --config=./src/drizzle.config.ts",
+    "generate": "tsx ./node_modules/drizzle-kit/bin.cjs generate --config=./src/drizzle.config.ts",
     "migrate": "tsx src/migrate.ts",
     "seed": "tsx src/seed.ts",
     "test": "echo \"db: no tests yet\""

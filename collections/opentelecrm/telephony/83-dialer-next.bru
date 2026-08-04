@@ -1,0 +1,38 @@
+meta {
+  name: 83 - Dialer next (power mode)
+  type: http
+  seq: 83
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/dialer/next
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "mode": "power",
+    "ignoreCallingWindow": true,
+    "limit": 1
+  }
+}
+
+script:post-response {
+  // Chain the top-ranked candidate into downstream requests. DND / call
+  // history can shrink the queue, so only set when a candidate exists.
+  const data = res.body && res.body.data;
+  if (Array.isArray(data) && data[0] && data[0].leadId) {
+    bru.setEnvVar('dialerLeadId', data[0].leadId);
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+}

@@ -1,0 +1,21 @@
+meta {
+  name: 81 - List calls
+  type: http
+  seq: 81
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/calls
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+  res.body.total: defined
+}

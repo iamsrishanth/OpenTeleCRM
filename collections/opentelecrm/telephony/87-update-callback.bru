@@ -1,0 +1,28 @@
+meta {
+  name: 87 - Mark callback done
+  type: http
+  seq: 87
+}
+
+patch {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/callbacks/{{callbackId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "status": "done"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: defined
+  res.body.status: eq done
+}

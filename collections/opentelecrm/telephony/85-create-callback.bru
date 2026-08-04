@@ -1,0 +1,37 @@
+meta {
+  name: 85 - Schedule callback (tomorrow 10am)
+  type: http
+  seq: 85
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/callbacks
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "leadId": "{{dialerLeadId}}",
+    "quickChip": "tomorrow_10am",
+    "note": "follow up demo"
+  }
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && data.id) {
+    bru.setEnvVar('callbackId', data.id);
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: defined
+  res.body.status: eq pending
+}

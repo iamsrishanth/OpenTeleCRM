@@ -34,6 +34,10 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 | [ADR-0023](#adr-0023-web-nextjs-15--react-19--shadcnui) | Web: Next.js 15 + React 19 + shadcn/ui | Accepted (planned) |
 | [ADR-0024](#adr-0024-mobile-react-native--watermelondb--ntfy) | Mobile: React Native + WatermelonDB + ntfy | Accepted (planned) |
 | [ADR-0025](#adr-0025-dev-auth-dev-jwt-secret--zitadel-in-prod) | Dev auth: `DEV_JWT_SECRET`, Zitadel in prod | Accepted (implemented) |
+| [ADR-0026](#adr-0026-telephony-asterisk--ari) | Telephony: Asterisk + ARI (chan_pjsip, Stasis `opentelecrm`) | Accepted (partial: provider scaffold + PBX config) |
+| [ADR-0027](#adr-0027-dialer-queue-scoring-pure-function) | Dialer queue scoring: pure function, weights documented | Accepted (implemented) |
+| [ADR-0028](#adr-0028-call-recording-storage-object-storage--signed-urls) | Call recording storage: object storage + signed URLs | Accepted (partial: metadata + signed URLs) |
+| [ADR-0029](#adr-0029-trai-calling-window-0900-2100) | TRAI calling window: 09:00–21:00, enforced in dialer | Accepted (implemented) |
 
 ---
 
@@ -529,4 +533,95 @@ Contract tests (6/6 green: `services/api/src/__tests__/metadata.contract.test.ts
 
 ---
 
-*Note: services/ai, services/analytics, services/automation, services/ingest, services/notifier, services/telephony, services/voice-agent, services/whatsapp and packages/connectors, contracts, i18n, phone, rule-engine, sdk-ts, testing, ui are scaffold directories — their ADRs land as the A1–A8 build waves execute. See RISKS.md for build-surface risk.*
+## ADR-0026: Telephony: Asterisk + ARI
+
+**Status:** Accepted (partial — ARI provider scaffold + PBX config shipped; live wiring deferred).
+
+**Context:** The A1.x call surface needs outbound dialing, live call state, recording, and (later) IVR/queues. The candidate PBXes were evaluated against the native-install directive (ADR-0001 — no Docker) and the FOSS license posture. ARI rides Asterisk's HTTP server, so the API service can integrate with plain HTTP + WebSocket — no C libraries, no AMI/AGI scripting.
+
+**Decision:** **Asterisk** (native apt install, systemd) with **ARI** (Asterisk REST Interface) as the integration surface, **chan_pjsip** as the SIP channel driver (trunk template + active `[from-crm]` endpoint), and a **Stasis application named `opentelecrm`**: the dialplan hands channels in via `Dial(Stasis/opentelecrm)` and Asterisk streams Stasis events (`StasisStart`, `ChannelStateChange`, `StasisEnd`) to the API, which maps them to CRM events (call.ringing, call.answered, call.ended, recording.*). ARI binds **127.0.0.1:8088** only (never `0.0.0.0`); credentials come from env (`ARI_PASSWORD`), never committed. The ARI client lives in `services/telephony` behind the `TelephonyProvider` contract (`packages/contracts`): mock provider for tests, `asterisk-ari` provider scaffolded to throw unless `TELEPHONY_ARI_*` env is set (fail loudly, never silent no-op). Implementation: `infra/asterisk/` (`ari.conf`, `pjsip.conf`, `extensions.conf`, systemd unit template, `provision/asterisk.sh` — idempotent, smoke-tests `GET /ari/asterisk/info`), `services/telephony/src/providers/asterisk-ari.provider.ts`.
+
+**Alternatives:** FreeSWITCH (powerful, but ESL/mod_verto integration is less standard and operator burden is heavier) — rejected; Kamailio (pure SIP proxy/router — no media application layer for recording/IVR; still a candidate SBC in front of Asterisk for carrier peering later) — deferred; legacy chan_sip (deprecated channel driver) — rejected in favor of chan_pjsip.
+
+**Consequences:**
+
+- + ARI is HTTP+JSON+WebSocket — standard, scriptable, fits the NestJS service without native deps.
+- + chan_pjsip gives modern SIP (transport-udp/tcp/tls) for trunks and endpoints.
+- − Live phase still to build: Stasis websocket subscription, channel originate (`POST /ari/channels`), recording control (`POST /ari/channels/{id}/record`), event → CRM mapping.
+- − ARI credentials are cleartext basic-auth in `ari.conf` (Asterisk requirement) — env-templated, loopback-bound, and any wider bind must be firewalled (RISKS.md).
+- − Supported topology is a single PBX host; multi-node needs the systemd unit template plus ARI over a private network (TLS in front via Caddy, ADR-0013).
+
+---
+
+## ADR-0027: Dialer queue scoring: pure function
+
+**Status:** Accepted (implemented).
+
+**Context:** The smart dialer (A1.1) must decide which lead an agent dials next. Naive FIFO ignores follow-ups, SLA, lead score, and fairness; a Temporal priority queue (ADR-0007) is the eventual home but adds a running dependency for what is currently a read-side ordering problem.
+
+**Decision:** Scoring is a **pure function** in `services/telephony/src/scoring.ts` (`scoreDialerCandidate` / `sortDialerCandidates`) — no I/O, no DB, deterministic under an injected `now`. Priority, highest first (all weights overridable via `DialerScoringConfig`):
+
+1. follow-up overdue — **+1000** (flat)
+2. follow-up due within 4h — **+500** (flat)
+3. SLA-breach risk — **+0..200** (scaled by overdue fraction past `slaHours`=24, only when no follow-up is scheduled)
+4. lead score — **+score × 0.5**
+5. freshness — **+0..50** (exponential decay, 48h half-life)
+6. round-robin fairness — **−20 per call dialed today**
+
+`services/api` `dialer/next` (dialer.controller.ts) uses the same config and excludes DND-registered numbers at the query (`dnd_registry`, channel `call`/`all`, ADR-0029). Tests inject `now` for determinism (`services/telephony/src/scoring.test.ts`; contract tests assert descending rank + reasons).
+
+**Alternatives:** naive FIFO (ignores all priority signals) — rejected; in-DB composite ORDER BY (weights undocumented, not unit-testable) — rejected; priority queue in Temporal (ADR-0007) — deferred until the automation services land; scoring inline in the API controller (duplicated, untestable) — rejected.
+
+**Consequences:**
+
+- + Unit-testable and deterministic; weights + reasons are first-class output, so the UI can explain rank.
+- + One source of truth — controller and any future worker import the same package.
+- − Weights are deployment defaults, not yet per-enterprise (config hooks exist; admin surface later).
+- − `skip` is a v1 no-op; fairness relies on the callsToday penalty.
+
+---
+
+## ADR-0028: Call recording storage: object storage + signed URLs
+
+**Status:** Accepted (partial — metadata + signed-URL endpoint implemented; storage/ingest pipeline deferred).
+
+**Context:** Recordings (A1.2) are sensitive audio: tenant-isolated, encrypted, and never served as static files. Local disk only was considered, but the stack already plans object storage (ADR-0010: Garage/SeaweedFS default, MinIO rejected — AGPL-3.0).
+
+**Decision:** Recordings live in **object storage** (Garage default per ADR-0010), keyed `recordings/{callId}.{ext}`. The `recording` table (`packages/db/src/telephony-schema.ts`) holds metadata only — `objectKey`, `mimeType`, `sizeBytes`, `durationSec`, `status` — never a long-lived URL. Playback goes through **short-lived signed URLs** issued by `GET /enterprise/{eid}/recordings/{id}` (1h expiry; mock `sig=mock` URL until object storage is wired, ADR-0026 live phase). The MixMonitor (Asterisk side) → object-store upload pipeline and transcripts (faster-whisper, ADR-0016) land later.
+
+**Alternatives:** local disk only — rejected (breaks multi-node, no tenant-isolated serving, no retention story); MinIO — AGPL-3.0, rejected by license posture (ADR-0010); Postgres bytea blobs — bloats the DB, rejected.
+
+**Consequences:**
+
+- + Tenant isolation + expiry by construction (RLS-scoped metadata, expiring signed URL).
+- + License-clean, consistent with ADR-0010.
+- − Recording privacy is a live risk until encryption-at-rest + per-role access land (RISKS.md).
+- − No upload pipeline yet — recordings are metadata-only until the MixMonitor phase.
+
+---
+
+## ADR-0029: TRAI calling window: 09:00-21:00
+
+**Status:** Accepted (implemented).
+
+**Context:** TRAI UCC/DND rules restrict telemarketing calls in India to a calling window; a telecalling CRM that dials outside it invites complaints and regulator action. The broadcast path (A2.4) already keeps a consent/opt-out ledger (`consent_ledger`); the call side needs the same discipline.
+
+**Decision:** Default calling window **09:00–21:00 (Asia/Kolkata)**, configurable via `DialerScoringConfig` (`callingWindowStart`/`callingWindowEnd`/`timezone`). Enforced in two places:
+
+1. `sortDialerCandidates` filters candidates outside the window (explicit `ignoreCallingWindow: true` overrides — tests / operator override).
+2. `dialer/next` excludes DND-registered numbers via `dnd_registry` (channel `call`/`all`) at query time.
+
+Window resolution uses `Intl.DateTimeFormat` — no TZ-database dependency. Broadcast throttle/jitter (A2.4) stays the WhatsApp-side guard; the DND registry is the shared call-side suppression list.
+
+**Alternatives:** no enforcement (operator responsibility only) — rejected: compliance posture is a product feature here; hard-coded constant (not configurable) — rejected: deployments outside India or with different hours need the knob; UI-only enforcement — rejected: API clients would bypass it.
+
+**Consequences:**
+
+- + Compliance by default; the override is explicit and auditable.
+- + Deterministic and testable (injected `now`, fixed timezone).
+- − Window is a deployment-level default, not yet per-enterprise.
+- − `dnd_registry` is seeded manually today; TRAI DND-list ingestion is future work (RISKS.md).
+
+---
+
+*Note: services/ai, services/analytics, services/automation, services/ingest, services/notifier, services/voice-agent and packages/connectors, i18n, phone, rule-engine, sdk-ts, testing, ui are scaffold directories — their ADRs land as the A1–A8 build waves execute. Telephony and contracts now carry theirs: ADR-0026–0029 (telephony) and ADR-0015 (WhatsApp provider surface). See RISKS.md for build-surface risk.*

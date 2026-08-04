@@ -28,14 +28,14 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A1.1 | 1-Click Dialer | — (planned: `services/api` + web app) | — | ❌ | — | — |
-| A1.2 | Call Recording | — (planned: `infra/asterisk` scaffold only) | — | ❌ | — | — |
-| A1.3 | Call Tracking | — | — | ❌ | — | — |
-| A1.4 | Click-to-Call | — | — | ❌ | — | — |
-| A1.5 | Follow-up Reminders | — | — | ❌ | — | — |
-| A1.6 | Live Caller ID | — | — | ❌ | — | — |
+| A1.1 | 1-Click Dialer | `services/telephony` (`scoring.ts`, `registry.ts`, providers) + `services/api` (`telephony/dialer.controller.ts`) | Asterisk ARI (scaffold, ADR-0026), mock provider | 🚧 | `dialer/next` returns ranked candidates (score + reasons, TRAI window-filtered, DND-suppressed); disposition logs a call + auto-schedules follow-up callback; `skip` is a no-op v1 (fairness via callsToday penalty). Live Asterisk dialing not wired — needs paired PBX (Stasis-events phase) | `telephony.contract.test.ts` (dialer/next + disposition suites) |
+| A1.2 | Call Recording | `packages/db` (`recording` table) + `services/api` (`telephony/recordings.controller.ts`) | Object storage (Garage, ADR-0028 — deferred) | 🚧 | Recording metadata + short-lived signed-URL endpoint green (`GET /recordings/:id`, 1h expiry, mock sig); actual MixMonitor → storage pipeline deferred to Asterisk wiring phase — no recording POST endpoint in this slice | `telephony.contract.test.ts` (recordings suite) |
+| A1.3 | Call Tracking | `packages/db` (`call` table) + `services/api` (`telephony/calls.controller.ts`) | Drizzle, NestJS | ✅ | Auto-links lead by identifier = phone; writes timeline `call` action; list filters (direction/status/disposition/leadId/from/to) + `total`; RLS-verified cross-tenant isolation | `telephony.contract.test.ts` (calls suites) |
+| A1.4 | Click-to-Call | — (planned: `apps/extension`) | — | ❌ | Browser extension not started | — |
+| A1.5 | Follow-up Reminders | `packages/db` (`callback` table) + `services/api` (`telephony/callbacks.controller.ts`, `callback-time.ts`) | Drizzle, NestJS | ✅ | Quick chips `1h`/`3h`/`tomorrow_10am`/`custom` (IST-aware); pending list + `?due=true` overdue subset; PATCH `done`/`cancelled`; dialer wrap-up auto-schedules (source `call_disposition`) | `telephony.contract.test.ts` (callbacks suite) |
+| A1.6 | Live Caller ID | `services/api` (`telephony/caller-id.controller.ts`) | Drizzle, NestJS | ✅ | `GET /caller-id/{phone}`: lead resolution (whitespace/dash-normalized identifier) + last 5 calls + last 5 actions + `create-lead` suggestion for unknown numbers (one-tap create flow) | `telephony.contract.test.ts` (caller-id suite) |
 | A1.7 | Opportunities / Payments | — (pipeline/stage tables exist as data model only) | — | ❌ | — | — |
-| A1.8 | Call widgets / queues / IVR | — (planned: `infra/asterisk`, `infra/helm`) | — | ❌ | — | — |
+| A1.8 | Call widgets / queues / IVR | — (`infra/asterisk` scaffold: `ari.conf`/`pjsip.conf`/`extensions.conf`/systemd) | — | ❌ | infra/asterisk scaffold exists but no IVR builder | — |
 
 ---
 
@@ -160,7 +160,7 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 | Area | ✅ | 🚧 | ❌ |
 |---|---|---|---|
 | F Foundation | 2 | 0 | 0 |
-| A1 Sales & Call | 0 | 0 | 8 |
+| A1 Sales & Call | 3 (A1.3, A1.5, A1.6) | 2 (A1.1, A1.2) | 3 (A1.4, A1.7, A1.8) |
 | A2 WhatsApp | 3 🚧 (A2.1, A2.2, A2.4) | 0 | 5 |
 | A3 Lead Capture | 0 | 0 | 2 |
 | A4 Automation | 0 | 0 | 7 |
@@ -170,6 +170,6 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 | A8 Support & Onboarding | 0 | 0 | 3 |
 | B Plans & Billing | 0 | 0 | 3 |
 
-**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **P2 WhatsApp (Partial 🚧):** contracts + provider abstraction, mock + Baileys drivers, unified inbox with auto lead-attribution, templates CRUD, broadcasts (create/start/opt-out) via mock driver — 43/43 contract tests, **17/17 Bruno collection green**. **Bruno collection (`collections/opentelecrm/`) runs green against the live API.** Real-number pairing is a documented CLI step (`pnpm --filter @opentelecrm/whatsapp pair`). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7), WhatsApp cloud-api/chatbot/widget/notifications. Everything in A1, A3–A5, A7, A8, B is not yet built.
+**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **P2 WhatsApp (Partial 🚧):** contracts + provider abstraction, mock + Baileys drivers, unified inbox with auto lead-attribution, templates CRUD, broadcasts (create/start/opt-out) via mock driver — 43/43 contract tests, **17/17 Bruno collection green**. **P3 Telephony (Partial 🚧):** `TelephonyProvider` contract + call domain types (`packages/contracts`), telephony schema (`call`/`recording`/`callback`/`dnd_registry`, migration 0002, RLS-wired), `services/telephony` mock + asterisk-ari providers + pure dialer scoring, `services/api` telephony module (calls A1.3, caller-id A1.6, dialer A1.1, callbacks A1.5, recordings A1.2 partial), `infra/asterisk` PBX scaffold (ari.conf/pjsip.conf/extensions.conf/systemd) — 19/19 telephony contract tests green, **62/62 contract tests total**. Live Asterisk dialing (paired trunk) + the recording pipeline (MixMonitor → object storage) land in the PBX-wiring phase — see PLAN-P3.md. **Bruno collection (`collections/opentelecrm/`) runs green against the live API.** Real-number pairing is a documented CLI step (`pnpm --filter @opentelecrm/whatsapp pair`). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7), WhatsApp cloud-api/chatbot/widget/notifications, telephony live-PBX dialing + recording pipeline (A1.1/A1.2). Everything in A1.4, A1.7, A1.8, A3–A5, A7, A8, B is not yet built.
 
 _Last updated: 2026-08-04. Keep in sync with `services/api`, `services/mcp`, `packages/db` as features land._

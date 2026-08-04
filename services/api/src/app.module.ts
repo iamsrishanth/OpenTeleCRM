@@ -8,9 +8,10 @@ import { TeamModule } from './sync/team.module.js';
 import { MetaModule } from './sync/meta.module.js';
 import { SyncModule } from './sync/sync.module.js';
 import { WhatsappModule } from './whatsapp/whatsapp.module.js';
+import { TelephonyModule } from './telephony/telephony.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule],
+  imports: [DatabaseModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule, TelephonyModule],
   controllers: [HealthController, MetadataController],
 })
 export class AppModule {}

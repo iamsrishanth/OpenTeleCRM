@@ -1,0 +1,21 @@
+meta {
+  name: 82 - Caller ID lookup
+  type: http
+  seq: 82
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/caller-id/%2B919100000001
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.found: defined
+  res.body.suggestion: defined
+}

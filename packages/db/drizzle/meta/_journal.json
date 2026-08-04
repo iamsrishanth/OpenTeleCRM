@@ -15,6 +15,13 @@
       "when": 1785834083707,
       "tag": "0001_fancy_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785841731410,
+      "tag": "0002_fast_chameleon",
+      "breakpoints": true
     }
   ]
 }

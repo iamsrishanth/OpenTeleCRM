@@ -1,0 +1,21 @@
+meta {
+  name: 86 - List callbacks for lead
+  type: http
+  seq: 86
+}
+
+get {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/callbacks?leadId={{dialerLeadId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: defined
+  res.body.total: defined
+}

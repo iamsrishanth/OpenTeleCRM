@@ -1,0 +1,39 @@
+meta {
+  name: 80 - Log outbound call
+  type: http
+  seq: 80
+}
+
+post {
+  url: {{baseUrl}}{{apiPrefix}}/enterprise/{{enterpriseId}}/calls
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: {{authToken}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "phone": "+919100000001",
+    "direction": "outbound",
+    "status": "completed",
+    "disposition": "answered",
+    "durationSec": 45
+  }
+}
+
+script:post-response {
+  const data = res.body;
+  if (data && data.id) {
+    bru.setEnvVar('callId', data.id);
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: defined
+  res.body.direction: eq outbound
+}

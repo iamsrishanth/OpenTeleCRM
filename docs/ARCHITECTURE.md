@@ -97,11 +97,13 @@ flowchart LR
 
 **Planned containers / packages:**
 
-- `contracts` (`packages/contracts`) — shared zod schemas for async/sync API bodies.
+- `contracts` (`packages/contracts`) — shared zod schemas for async/sync API bodies — **implemented** (WhatsApp P2 + telephony P3 provider surfaces).
 - `rule-engine` (`packages/rule-engine`) — lead routing / assignment logic.
 - `connectors` (`packages/connectors`) — WhatsApp (Baileys), telephony adapters.
-- `whatsapp`, `telephony`, `automation` (Temporal), `analytics` (ClickHouse),
-  `ai`, `notifier` — future service containers (see L2 dashed boxes).
+- `whatsapp`, `automation` (Temporal), `analytics` (ClickHouse), `ai`, `notifier` —
+  future service containers (see L2 dashed boxes). `telephony` shipped its P3 slice
+  (mock + asterisk-ari providers, dialer scoring) — live Asterisk wiring is next
+  (see PLAN-P3.md).
 
 ---
 
@@ -211,6 +213,41 @@ Exports: `Enterprise`, `User`, `TeamMember`, `Role`, `Lead`, `LeadField`,
 `AuditLog`, plus RBAC role kinds (`owner | admin | manager | team_lead | agent |
 read_only | custom`) and permission codes.
 
+### Telephony (`services/telephony` + `infra/asterisk`) — P3 slice
+
+```mermaid
+flowchart LR
+  API[services/api<br/>telephony module]
+  TEL[services/telephony<br/>TelephonyProvider registry]
+  MOCK[mock provider<br/>tests / dev]
+  ARI[asterisk-ari provider<br/>scaffold — live wiring next]
+  PBX[(Asterisk 21<br/>native · systemd<br/>ARI :8088 loopback)]
+  DB[(Postgres<br/>call/recording/<br/>callback/dnd_registry)]
+
+  API --> TEL
+  TEL --> MOCK
+  TEL -.-> ARI
+  ARI -.->|HTTP + WS<br/>Stasis events| PBX
+  API -->|withTenant tx| DB
+```
+
+- **`TelephonyProvider`** (`packages/contracts`) — the provider boundary: `dial`,
+  `hangup`, `callState`, `startRecording`, `stopRecording`, `on`. Mock provider
+  serves tests; the `asterisk-ari` provider is scaffolded (throws unless
+  `TELEPHONY_ARI_*` env is set — fail loudly, never silent no-op).
+- **Dialer scoring** (`scoring.ts`) — pure functions (`scoreDialerCandidate`,
+  `sortDialerCandidates`, `callingWindowAllowed`): follow-up due > SLA breach >
+  lead score > freshness > round-robin; TRAI window 09:00–21:00 IST enforced
+  (ADR-0027/ADR-0029).
+- **API module** (`services/api/src/telephony/`) — calls (A1.3), caller-id
+  (A1.6), dialer (A1.1), callbacks (A1.5), recordings (A1.2 partial) — all
+  through `withTenant(eid, …)`; `dnd_registry` suppresses DND numbers in
+  `dialer/next`.
+- **PBX scaffold** (`infra/asterisk/`) — `ari.conf` (loopback, user
+  `opentelecrm`), `pjsip.conf`, `extensions.conf` (Stasis hook-in), systemd unit
+  template, provision script. Live ARI/Stasis wiring + the MixMonitor recording
+  pipeline are the next phase — see PLAN-P3.md.
+
 ### `db` (`packages/db`)
 
 ```mermaid
@@ -230,7 +267,9 @@ flowchart TD
   R -->|ALTER ... ENABLE / FORCE ROW LEVEL SECURITY| PG
 ```
 
-- **`schema.ts`** — Drizzle schema, 13 tables. `.id` (`uuid`, `defaultRandom`),
+- **`schema.ts`** — Drizzle schema, 13 core tables + 4 telephony tables (`call`,
+  `recording`, `callback`, `dndRegistry` in `telephony-schema.ts`, P3). `.id`
+  (`uuid`, `defaultRandom`),
   `.enterpriseId` FK cascade pattern, jsonb for `permissions` / `customFields` /
   `config` / `payload` / `before|after`, `created_at/updated_at` defaults, plus
   indexes (always tenant-led, e.g. `lead_ent_idx`, `lead_pipe_stage_idx`).
@@ -238,11 +277,12 @@ flowchart TD
   `lostReason`, `leadField`, `lead`, `actionType`, `action`, `apiToken`,
   `auditLog`.
 - **`rls.ts`** — `enableRls(db)` enables RLS, applies `FORCE ROW LEVEL SECURITY`,
-  and creates the single policy `enterprise_isolation` on the 11 tenanted tables
+  and creates the single policy `enterprise_isolation` on the 11 tenanted core tables
   (`TENANT_TABLES`): `USING` / `WITH CHECK (enterprise_id::text =
   current_setting('app.enterprise_id', true))`. The TEXT cast avoids a uuid cast
   error on an unset pooled variable — unset ⇒ NULL ⇒ 0 rows, safely. `enterprise`
-  and `user` are not tenant-scoped (no `enterprise_id`). `setTenantContext(eid)`
+  and `user` are not tenant-scoped (no `enterprise_id`). The 4 telephony tables
+  are RLS-enforced via `TELEPHONY_TENANT_TABLES` (same policy). `setTenantContext(eid)`
   emits `SELECT set_config('app.enterprise_id', …)`.
 - **`index.ts`** — shared `pg.Pool` (max 10), `getDb()` (Drizzle `node-postgres`),
   and **`withTenant`**: `BEGIN` → `set_config('app.enterprise_id', eid, true)` →
@@ -328,7 +368,7 @@ Wire-compat is enforced today at the **contract test** layer
 | Container | Tech | Notes |
 |-----------|------|-------|
 | `whatsapp` | Node + Baileys | Inbound/outbound WhatsApp across tenants |
-| `telephony` | Asterisk / PSTN adapters | Call state, dial-out, recording |
+| `telephony` | Asterisk / PSTN adapters | Call state, dial-out, recording — P3 slice shipped (`TelephonyProvider` contract, mock + ARI providers, dialer scoring, calls/caller-id/dialer/callbacks/recordings API); live ARI wiring next (see PLAN-P3.md) |
 | `automation` | **Temporal** | Async job execution, workflows, retries |
 | `analytics` | **ClickHouse** | Reporting over lead/action/audit data |
 | `ai` | faster-whisper / Piper / XTTS | Transcription & voice generation |
