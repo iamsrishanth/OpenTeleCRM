@@ -152,3 +152,140 @@ export interface ConsentRecord {
   /** Reason / audit trail (who or what changed it). */
   note?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Telephony provider interface — implements TeleCRM's call management (A1.x)
+// ---------------------------------------------------------------------------
+
+export type CallDirection = 'inbound' | 'outbound';
+
+export type CallStatus =
+  | 'queued'
+  | 'ringing'
+  | 'in-progress'
+  | 'completed'
+  | 'failed'
+  | 'no-answer'
+  | 'missed'
+  | 'rejected'
+  | 'busy'
+  | 'cancelled';
+
+export type CallDisposition =
+  | 'answered'
+  | 'no_answer'
+  | 'busy'
+  | 'not_connected'
+  | 'wrong_number'
+  | 'not_interested'
+  | 'callback'
+  | 'dnc'
+  | 'converted'
+  | 'follow_up'
+  | 'other';
+
+export interface CallRecord {
+  id: string;
+  enterpriseId: string;
+  /** Linked lead when the number resolved (auto from caller-id / dialer). */
+  leadId: string | null;
+  direction: CallDirection;
+  status: CallStatus;
+  disposition: CallDisposition | null;
+  /** E.164-normalized dialed/calling party number. */
+  phone: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSec: number;
+  /** Talk time (excludes ring/wrap-up). */
+  talkSec: number;
+  ringSec: number;
+  recordingId: string | null;
+  trunk: string | null;
+  did: string | null;
+  agentUserId: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface RecordingRef {
+  id: string;
+  callId: string;
+  /** Short-lived signed URL (object storage). */
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationSec: number;
+  status: 'recorded' | 'processing' | 'ready' | 'failed';
+}
+
+/** Follow-up reminder (A1.5) — quick chips: 1h / 3h / tomorrow 10am / custom. */
+export interface CallbackRequest {
+  id: string;
+  enterpriseId: string;
+  leadId: string;
+  dueAt: string;
+  status: 'pending' | 'done' | 'cancelled' | 'missed';
+  source: 'manual' | 'dialer' | 'automation' | 'call_disposition';
+  channel: 'in_app' | 'whatsapp' | 'email' | 'push' | 'call';
+  note: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+/** Smart dialer queue candidate (A1.1). Score = priority; higher dials first. */
+export interface DialerCandidate {
+  leadId: string;
+  identifier: string;
+  phone: string;
+  score: number;
+  /** Human-readable priority breakdown, e.g. ["follow-up-due +500", "score +42"]. */
+  reasons: string[];
+  followUpDueAt: string | null;
+  slaBreachRisk: number;
+  leadScore: number;
+  freshnessHours: number;
+  lastDialedAt: string | null;
+}
+
+export type DialerMode = 'power' | 'preview' | 'progressive';
+
+/**
+ * The provider boundary for telephony. Every driver (mock, Asterisk ARI)
+ * implements this exactly. The domain layer (dialer, caller-id, call logging)
+ * only ever sees this surface — no PBX details leak upward.
+ */
+export interface TelephonyProvider {
+  readonly kind: 'mock' | 'asterisk-ari';
+
+  /** Place an outbound call; returns the provider-side call id. */
+  dial(to: string, from?: string, context?: Record<string, unknown>): Promise<{ callId: string }>;
+
+  /** Hang up an in-progress call. */
+  hangup(callId: string): Promise<void>;
+
+  /** Current status + elapsed seconds for a call (polled by the dialer). */
+  callState(callId: string): Promise<{ status: CallStatus; durationSec: number }>;
+
+  /** Start recording on a live call; returns a provider-side recording id. */
+  startRecording(callId: string): Promise<{ recordingId: string }>;
+
+  /** Stop recording; finalizes the audio object. */
+  stopRecording(callId: string): Promise<{ recordingId: string }>;
+
+  /**
+   * Subscribe to lifecycle events. cb receives a CallRecord-ish update for
+   * 'call' events or a status string for 'status' events (discriminate by the
+   * event name). Returns an unsubscribe fn.
+   */
+  on(event: 'call' | 'status', cb: (arg: unknown) => void): () => void;
+}
+
+/** TRAI UCC/DND compliance hook: a number blocked from a channel. */
+export interface DndEntry {
+  phone: string;
+  channel: 'call' | 'whatsapp' | 'sms' | 'all';
+  source: 'trai' | 'enterprise' | 'agent';
+  reason?: string | null;
+  expiresAt?: string | null;
+}

@@ -147,6 +147,37 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  services/telephony:
+    dependencies:
+      '@opentelecrm/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@opentelecrm/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      drizzle-orm:
+        specifier: ^0.38.4
+        version: 0.38.4(@types/pg@8.20.3)(pg@8.22.0)(postgres@3.4.9)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.5
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   services/whatsapp:
     dependencies:
       '@opentelecrm/contracts':

@@ -1,0 +1,40 @@
+# OpenTeleCRM — Asterisk systemd unit (TEMPLATE for a separate PBX host).
+#
+# NOTE: the Debian 'asterisk' package already ships and enables its own
+#   asterisk.service (Type=forking, daemonized). On the standard single-host
+#   deployment (ADR-0001 native install) you do NOT need this unit — just
+#   `systemctl restart asterisk`.
+#
+# This unit exists for the separate-PBX-host pattern: a dedicated telephony
+# box running OpenTeleCRM's Asterisk, supervised by systemd with the same
+# conventions as the rest of the stack (opentelecrm-* units, Restart=on-failure).
+#
+# Install (replace /usr/local/share/asterisk.conf template paths as needed):
+#   sudo install -m 0644 opentelecrm-asterisk.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now opentelecrm-asterisk
+#
+# Run from the repo:  systemctl {start,stop,restart,status} opentelecrm-asterisk
+
+[Unit]
+Description=OpenTeleCRM Asterisk PBX (native, no Docker — ADR-0001)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Asterisk drops privileges to the 'asterisk' system user (created by the
+# distro package); never run as root.
+User=asterisk
+Group=asterisk
+# -f: stay in foreground (systemd supervises the process directly).
+# -U/-G: explicit user/group drop even if the unit is started by root.
+ExecStart=/usr/sbin/asterisk -f -U asterisk -G asterisk
+ExecReload=/usr/sbin/asterisk -rx "core reload"
+Restart=on-failure
+RestartSec=5
+# ARI/Stasis + media on busy telephony hosts need headroom on file descriptors.
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

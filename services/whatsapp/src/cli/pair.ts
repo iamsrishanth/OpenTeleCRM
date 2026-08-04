@@ -109,9 +109,9 @@ async function main(): Promise<void> {
   }
   showCode(pairingCode);
 
-  // 3) Hold and wait for the link. Do NOT re-request the code. If the socket
-  //    drops, reconnect with the SAME provider (creds persist in memory + file)
-  //    and keep waiting — the code remains valid until used or ~60s elapses.
+  // 3) Hold and wait for the link. If the socket drops, the server-side
+  //    pairing session dies with it — so on reconnect we must request a
+  //    FRESH code (the old one is invalid). Loop until linked or deadline.
   const deadline = Date.now() + LINK_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const outcome = await new Promise<'ready' | 'down' | 'timeout'>((resolve) => {
@@ -141,11 +141,31 @@ async function main(): Promise<void> {
       break;
     }
     if (outcome === 'down') {
-      console.log(`[pair] socket dropped — reconnecting, code still valid (${Math.round((deadline - Date.now()) / 1000)}s left)`);
+      console.log(`[pair] socket dropped — reconnecting and refreshing code (${Math.round((deadline - Date.now()) / 1000)}s left)`);
       try {
         await provider.connect(SESSION_ID);
       } catch (err) {
         console.error('[pair] reconnect failed:', err instanceof Error ? err.message : err);
+        await new Promise((r) => setTimeout(r, 3_000));
+        continue;
+      }
+      // Wait for registration mode again, then request a fresh code.
+      const qrAgain = new Promise<void>((resolve) => {
+        const unsub2 = provider.onQr(() => {
+          unsub2();
+          resolve();
+        });
+        setTimeout(() => {
+          unsub2();
+          resolve();
+        }, 15_000);
+      });
+      await qrAgain;
+      try {
+        pairingCode = await provider.requestPairingCode(SESSION_ID, phone);
+        showCode(pairingCode);
+      } catch (err) {
+        console.error('[pair] refresh code failed:', err instanceof Error ? err.message : err);
       }
     } else {
       console.log(`[pair] waiting for link... (${Math.round((deadline - Date.now()) / 1000)}s left)`);

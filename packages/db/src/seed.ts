@@ -7,6 +7,7 @@
  *
  * Usage: pnpm --filter @opentelecrm/db seed
  */
+import { eq } from 'drizzle-orm';
 import { getDb, getPool, withTenant } from './index.js';
 import {
   actionType,
@@ -20,6 +21,7 @@ import {
   user,
 } from './schema.js';
 import { conversation, waMessage, waTemplate, waSession } from './whatsapp-schema.js';
+import { call, callback, dndRegistry } from './telephony-schema.js';
 
 const LEAD_COUNT = 5_000;
 const CUSTOM_FIELDS = 20;
@@ -223,6 +225,119 @@ async function main() {
         },
       ])
       .execute();
+
+    // 9. Telephony demo: 3 calls, 2 callbacks, 1 DND registry entry.
+    //    Idempotent-safe: guard on a count check (fresh enterprise each run,
+    //    so the block only ever seeds once per enterprise).
+    const [existingDnd] = await db
+      .select({ id: dndRegistry.id })
+      .from(dndRegistry)
+      .where(eq(dndRegistry.enterpriseId, eid))
+      .limit(1);
+    if (!existingDnd) {
+      // Real lead ids + E.164 identifiers from the just-seeded leads.
+      const sampleLeads = await db
+        .select({ id: lead.id, identifier: lead.identifier })
+        .from(lead)
+        .where(eq(lead.enterpriseId, eid))
+        .limit(3);
+      const [l0, l1, l2] = sampleLeads;
+      if (l0 && l1 && l2) {
+        const now = new Date();
+        const callValues = [
+          {
+            enterpriseId: eid,
+            leadId: l0.id,
+            direction: 'outbound',
+            status: 'completed',
+            disposition: 'converted',
+            phone: l0.identifier,
+            startedAt: new Date(now.getTime() - 1000 * 60 * 120),
+            endedAt: new Date(now.getTime() - 1000 * 60 * 116),
+            durationSec: 245,
+            talkSec: 180,
+            ringSec: 15,
+            trunk: 'PRI-01',
+            did: '+911123456789',
+            note: 'Demo: lead converted on call',
+          },
+          {
+            enterpriseId: eid,
+            leadId: l1.id,
+            direction: 'outbound',
+            status: 'completed',
+            disposition: 'callback',
+            phone: l1.identifier,
+            startedAt: new Date(now.getTime() - 1000 * 60 * 60),
+            endedAt: new Date(now.getTime() - 1000 * 60 * 58),
+            durationSec: 95,
+            talkSec: 60,
+            ringSec: 8,
+            trunk: 'PRI-01',
+            did: '+911123456789',
+            note: 'Demo: asked for a callback',
+          },
+          {
+            enterpriseId: eid,
+            leadId: l2.id,
+            direction: 'inbound',
+            status: 'missed',
+            disposition: 'no_answer',
+            phone: l2.identifier,
+            startedAt: new Date(now.getTime() - 1000 * 60 * 30),
+            endedAt: null,
+            durationSec: 0,
+            talkSec: 0,
+            ringSec: 25,
+            trunk: 'PRI-01',
+            did: '+911123456789',
+            note: 'Demo: missed inbound call',
+          },
+        ];
+        await db.insert(call).values(callValues).execute();
+
+        // Callbacks: one overdue (pending), one due tomorrow 10:00 IST.
+        await db
+          .insert(callback)
+          .values([
+            {
+              enterpriseId: eid,
+              leadId: l1.id,
+              dueAt: new Date(now.getTime() - 1000 * 60 * 60 * 2),
+              status: 'pending',
+              source: 'call_disposition',
+              channel: 'in_app',
+              note: 'Follow up on callback request from demo call',
+            },
+            {
+              enterpriseId: eid,
+              leadId: l2.id,
+              dueAt: new Date(
+                Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 4, 30, 0),
+              ), // 10:00 IST = 04:30 UTC
+              status: 'pending',
+              source: 'manual',
+              channel: 'call',
+              note: 'Scheduled follow-up (10:00 IST)',
+            },
+          ])
+          .execute();
+
+        // DND registry (TRAI UCC suppression demo).
+        await db
+          .insert(dndRegistry)
+          .values({
+            enterpriseId: eid,
+            phone: '+919188888888',
+            channel: 'all',
+            source: 'enterprise',
+            reason: 'Demo: opted out of all telephony contact',
+          })
+          .execute();
+
+        console.log('Telephony demo: 3 calls, 2 callbacks, 1 DND registry entry seeded.');
+      }
+    }
   });
 
   console.log(

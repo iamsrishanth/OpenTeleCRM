@@ -18,13 +18,16 @@ import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.js';
 import * as whatsappSchema from './whatsapp-schema.js';
+import * as telephonySchema from './telephony-schema.js';
 import { TENANT_TABLES } from './schema.js';
 import { WHATSAPP_TENANT_TABLES } from './whatsapp-schema.js';
+import { TELEPHONY_TENANT_TABLES } from './telephony-schema.js';
 
 /** The merged set of tenant-scoped tables RLS is applied to. */
 export const ALL_TENANT_TABLES = [
   ...TENANT_TABLES,
   ...WHATSAPP_TENANT_TABLES,
+  ...TELEPHONY_TENANT_TABLES,
 ] as const;
 
 export interface RlsContext {
@@ -45,7 +48,9 @@ function tableName(table: unknown): string {
  * Enables RLS + the enterprise policy + FORCE on every tenanted table.
  * Runs inside the migration bootstrap; idempotent.
  */
-export async function enableRls(db: NodePgDatabase<typeof schema & typeof whatsappSchema>): Promise<void> {
+export async function enableRls(
+  db: NodePgDatabase<typeof schema & typeof whatsappSchema & typeof telephonySchema>,
+): Promise<void> {
   for (const table of ALL_TENANT_TABLES) {
     const name = tableName(table);
     // Enable RLS
