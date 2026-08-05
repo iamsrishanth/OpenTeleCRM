@@ -1,0 +1,713 @@
+/**
+ * Automation service — the in-process rule engine the API controller, webhook
+ * controller, and scheduler all share.
+ *
+ * Responsibilities (P4, A4.1-A4.5):
+ *   - CRUD on automation_rule rows
+ *   - run / step row management
+ *   - in-memory cache of active rules per tenant (refreshed on CRUD)
+ *   - fire(event): queue matched rules, dispatch action chain asynchronously
+ *   - skip-the-run when conditions don't match (still records a 'skipped' run)
+ *
+ * Design (mirrors the audit-service "fire-and-forget" contract):
+ *   - fire() never throws — it logs + returns. A user-facing mutation that
+ *     calls fire() right after the audit-hook must not crash because the
+ *     rule engine tripped.
+ *   - the action chain runs in setImmediate() after the response is sent,
+ *     so automation latency does not block the original mutation.
+ *   - on every CRUD op the per-tenant rule cache is replaced atomically.
+ *
+ * Storage: the dispatcher calls into a pluggable ActionExecutor registry;
+ * see dispatcher.ts. Rules that match no executor kind write a 'skipped' step
+ * so the test contract still sees a row.
+ */
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import type { DbClient } from '@opentelecrm/db';
+import {
+  automation,
+  automationRun,
+  automationStep,
+} from '@opentelecrm/db';
+import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { AuditService } from '../audit/audit.service.js';
+import {
+  evaluateActionConfig,
+  type ActionExecutorContext,
+} from './dispatcher.js';
+import type {
+  AutomationAction,
+  AutomationConditionLeaf,
+  AutomationConditionTree,
+  AutomationEvent,
+  AutomationRule,
+  AutomationRun,
+  AutomationRunStatus,
+  AutomationStepStatus,
+  AutomationTriggerSpec,
+  CreateRuleDto,
+  UpdateRuleDto,
+} from './types.js';
+import { nextCronTick } from './cron.js';
+
+type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
+
+/** DB row → internal AutomationRule shape. */
+function rowToRule(r: typeof automation.$inferSelect): AutomationRule {
+  return {
+    id: r.id,
+    enterpriseId: r.enterpriseId,
+    name: r.name,
+    description: r.description ?? null,
+    trigger: (r.triggerKind
+      ? { kind: r.triggerKind as AutomationRule['trigger']['kind'], config: r.triggerConfig ?? {} }
+      : { kind: 'manual' as const, config: {} }),
+    conditions: (r.conditions && Object.keys(r.conditions).length > 0
+      ? (r.conditions as unknown as AutomationConditionTree)
+      : null),
+    actions: (r.actions ?? []) as unknown as AutomationAction[],
+    schedule: (r.schedule as { cron: string; timezone?: string } | null) ?? null,
+    assignmentScope: (r.assignmentScope as Record<string, unknown> | null) ?? null,
+    isActive: r.isActive,
+    priority: r.priority,
+    lastRunAt: r.lastRunAt ?? null,
+    nextRunAt: r.nextRunAt ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+@Injectable()
+export class AutomationService implements OnModuleInit {
+  // Tenant → cached active rules. Refreshed on CRUD; consulted by fire()
+  // and by the cron scheduler. Empty when no rules are active; the
+  // Map itself is the source of truth — a missing key means "no rules".
+  private cache: Map<string, AutomationRule[]> = new Map();
+
+  constructor(
+    @Inject(DB_PROVIDER) private db: DbClient,
+    @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+    @Inject(AuditService) private readonly auditService: AuditService,
+  ) {}
+
+  /**
+   * Warm the in-memory cache at boot. We don't fail boot on error — the
+   * scheduler's first tick will lazily re-fetch per tenant if the warm
+   * load missed anything. The scheduler also calls refreshTenant() defensively.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      // Group active rules by enterprise id; we only need active + non-archived
+      // rules for the live event/schedule path.
+      const rows = await this.db
+        .select()
+        .from(automation)
+        .where(eq(automation.isActive, true))
+        .orderBy(asc(automation.enterpriseId), desc(automation.priority));
+      const grouped = new Map<string, AutomationRule[]>();
+      for (const r of rows) {
+        const eid = r.enterpriseId;
+        const rule = rowToRule(r);
+        if (!grouped.has(eid)) grouped.set(eid, []);
+        grouped.get(eid)!.push(rule);
+      }
+      this.cache = grouped;
+    } catch (err) {
+      console.warn('[automation] cache warm failed (will lazy-refresh):', err);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // CRUD
+  // -------------------------------------------------------------------------
+
+  async createRule(eid: string, dto: CreateRuleDto, actorUserId?: string): Promise<AutomationRule> {
+    const triggerSpec: AutomationTriggerSpec = dto.trigger ?? { kind: 'manual' };
+    const nextRunAt =
+      triggerSpec.kind === 'schedule' && dto.schedule
+        ? nextCronTick(dto.schedule.cron)
+        : null;
+
+    const [row] = await this.withTenant(eid, async (db) =>
+      db
+        .insert(automation)
+        .values({
+          enterpriseId: eid,
+          name: dto.name,
+          description: dto.description ?? null,
+          category: 'general',
+          triggerKind: triggerSpec.kind,
+          triggerConfig: triggerSpec.config ?? {},
+          conditions: (dto.conditions ?? {}) as Record<string, unknown>,
+          actions: (dto.actions ?? []) as unknown as Record<string, unknown>[],
+          schedule: (dto.schedule as Record<string, unknown> | null) ?? null,
+          ownerUserId: actorUserId && isUuid(actorUserId) ? actorUserId : null,
+          assignmentScope: dto.assignmentScope ?? null,
+          isActive: dto.isActive ?? true,
+          priority: dto.priority ?? 100,
+          coalesceWindowSec: 0,
+          nextRunAt: nextRunAt ?? null,
+        })
+        .returning(),
+    );
+    if (!row) throw new Error('automation insert returned no row');
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId,
+      action: 'automation.created',
+      resourceType: 'automation',
+      resourceId: row.id,
+      after: { name: row.name, trigger: triggerSpec.kind, actions: row.actions.length },
+    });
+    this.invalidate(eid);
+    return rowToRule(row);
+  }
+
+  async listRules(eid: string): Promise<AutomationRule[]> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automation)
+        .where(eq(automation.enterpriseId, eid))
+        .orderBy(desc(automation.priority), asc(automation.createdAt)),
+    );
+    return rows.map(rowToRule);
+  }
+
+  async getRule(eid: string, id: string): Promise<AutomationRule | null> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automation)
+        .where(and(eq(automation.enterpriseId, eid), eq(automation.id, id)))
+        .limit(1),
+    );
+    if (!rows[0]) return null;
+    return rowToRule(rows[0]);
+  }
+
+  async updateRule(
+    eid: string,
+    id: string,
+    dto: UpdateRuleDto,
+    actorUserId?: string,
+  ): Promise<AutomationRule | null> {
+    const set: Partial<typeof automation.$inferInsert> = { updatedAt: new Date() };
+    if (dto.name !== undefined) set.name = dto.name;
+    if (dto.description !== undefined) set.description = dto.description;
+    if (dto.conditions !== undefined)
+      set.conditions = (dto.conditions ?? {}) as Record<string, unknown>;
+    if (dto.actions !== undefined)
+      set.actions = dto.actions as unknown as Record<string, unknown>[];
+    if (dto.schedule !== undefined)
+      set.schedule = (dto.schedule as Record<string, unknown> | null) ?? null;
+    if (dto.isActive !== undefined) set.isActive = dto.isActive;
+    if (dto.priority !== undefined) set.priority = dto.priority;
+
+    // Re-arm schedule if the cron changed.
+    if (dto.schedule && typeof dto.schedule.cron === 'string') {
+      set.nextRunAt = nextCronTick(dto.schedule.cron) ?? null;
+    }
+
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .update(automation)
+        .set(set)
+        .where(and(eq(automation.enterpriseId, eid), eq(automation.id, id)))
+        .returning(),
+    );
+    if (!rows[0]) return null;
+    await this.auditService.record({
+      enterpriseId: eid,
+      actorUserId,
+      action: 'automation.updated',
+      resourceType: 'automation',
+      resourceId: id,
+      after: { fields: Object.keys(dto) },
+    });
+    this.invalidate(eid);
+    return rowToRule(rows[0]);
+  }
+
+  async deleteRule(eid: string, id: string, actorUserId?: string): Promise<boolean> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .delete(automation)
+        .where(and(eq(automation.enterpriseId, eid), eq(automation.id, id)))
+        .returning({ id: automation.id }),
+    );
+    const ok = rows.length > 0;
+    if (ok) {
+      await this.auditService.record({
+        enterpriseId: eid,
+        actorUserId,
+        action: 'automation.deleted',
+        resourceType: 'automation',
+        resourceId: id,
+      });
+      this.invalidate(eid);
+    }
+    return ok;
+  }
+
+  // -------------------------------------------------------------------------
+  // Run / step management
+  // -------------------------------------------------------------------------
+
+  async createRun(
+    eid: string,
+    ruleId: string,
+    leadId: string | null,
+    triggerPayload: Record<string, unknown>,
+    correlationId: string | null,
+  ): Promise<AutomationRun> {
+    const [row] = await this.withTenant(eid, async (db) =>
+      db
+        .insert(automationRun)
+        .values({
+          enterpriseId: eid,
+          automationId: ruleId,
+          leadId: leadId ?? null,
+          status: 'queued',
+          correlationId: correlationId ?? null,
+          triggerPayload,
+          resolvedContext: {},
+          stepsExecuted: 0,
+          conditionsMatched: true,
+        })
+        .returning(),
+    );
+    if (!row) throw new Error('automation_run insert returned no row');
+    return {
+      id: row.id,
+      enterpriseId: row.enterpriseId,
+      automationId: row.automationId,
+      leadId: row.leadId,
+      status: row.status as AutomationRunStatus,
+      correlationId: row.correlationId,
+      triggerPayload: row.triggerPayload,
+      resolvedContext: row.resolvedContext,
+      stepsExecuted: row.stepsExecuted,
+      conditionsMatched: row.conditionsMatched,
+      error: row.error,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
+      durationMs: row.durationMs,
+    };
+  }
+
+  async updateRunStatus(
+    eid: string,
+    runId: string,
+    status: AutomationRunStatus,
+    error?: string | null,
+  ): Promise<void> {
+    const set: Partial<typeof automationRun.$inferInsert> = { status };
+    if (status === 'running') {
+      set.startedAt = new Date();
+    }
+    if (status === 'success' || status === 'failed' || status === 'skipped') {
+      set.finishedAt = new Date();
+    }
+    if (error !== undefined) set.error = error;
+    await this.withTenant(eid, async (db) =>
+      db.update(automationRun).set(set).where(eq(automationRun.id, runId)),
+    );
+  }
+
+  async addStep(
+    eid: string,
+    runId: string,
+    order: number,
+    kind: AutomationAction['kind'],
+    config: Record<string, unknown>,
+    output?: Record<string, unknown> | null,
+    error?: string | null,
+    durationMs = 0,
+  ): Promise<void> {
+    const status: AutomationStepStatus = error ? 'failed' : 'success';
+    const now = new Date();
+    await this.withTenant(eid, async (db) =>
+      db.insert(automationStep).values({
+        enterpriseId: eid,
+        runId,
+        order,
+        kind,
+        config,
+        output: output ?? null,
+        error: error ?? null,
+        status,
+        startedAt: now,
+        finishedAt: now,
+        durationMs,
+      }),
+    );
+    // Bump the run's step counter.
+    await this.withTenant(eid, async (db) =>
+      db
+        .update(automationRun)
+        .set({ stepsExecuted: sql`${automationRun.stepsExecuted} + 1` })
+        .where(eq(automationRun.id, runId)),
+    );
+  }
+
+  async getRun(eid: string, runId: string): Promise<AutomationRun | null> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db.select().from(automationRun).where(eq(automationRun.id, runId)).limit(1),
+    );
+    if (!rows[0]) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      enterpriseId: r.enterpriseId,
+      automationId: r.automationId,
+      leadId: r.leadId,
+      status: r.status as AutomationRunStatus,
+      correlationId: r.correlationId,
+      triggerPayload: r.triggerPayload,
+      resolvedContext: r.resolvedContext,
+      stepsExecuted: r.stepsExecuted,
+      conditionsMatched: r.conditionsMatched,
+      error: r.error,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt,
+      durationMs: r.durationMs,
+    };
+  }
+
+  async getRunByCorrelation(
+    eid: string,
+    correlationId: string,
+  ): Promise<AutomationRun | null> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automationRun)
+        .where(
+          and(
+            eq(automationRun.enterpriseId, eid),
+            eq(automationRun.correlationId, correlationId),
+          ),
+        )
+        .orderBy(desc(automationRun.startedAt))
+        .limit(1),
+    );
+    if (!rows[0]) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      enterpriseId: r.enterpriseId,
+      automationId: r.automationId,
+      leadId: r.leadId,
+      status: r.status as AutomationRunStatus,
+      correlationId: r.correlationId,
+      triggerPayload: r.triggerPayload,
+      resolvedContext: r.resolvedContext,
+      stepsExecuted: r.stepsExecuted,
+      conditionsMatched: r.conditionsMatched,
+      error: r.error,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt,
+      durationMs: r.durationMs,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Cache management
+  // -------------------------------------------------------------------------
+
+  invalidate(eid: string): void {
+    this.cache.delete(eid);
+  }
+
+  /** Force-refresh the per-tenant cache (used by the scheduler's first tick). */
+  async refreshTenant(eid: string): Promise<AutomationRule[]> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automation)
+        .where(
+          and(
+            eq(automation.enterpriseId, eid),
+            eq(automation.isActive, true),
+          ),
+        )
+        .orderBy(desc(automation.priority)),
+    );
+    const rules = rows.map(rowToRule);
+    this.cache.set(eid, rules);
+    return rules;
+  }
+
+  private async getActiveRulesFor(eid: string): Promise<AutomationRule[]> {
+    const cached = this.cache.get(eid);
+    if (cached) return cached;
+    return this.refreshTenant(eid);
+  }
+
+  // -------------------------------------------------------------------------
+  // Fire
+  // -------------------------------------------------------------------------
+
+  /**
+   * Main entry point called by the event hooks in other controllers.
+   * NEVER throws. The mutation that produced the event must not be broken
+   * by an automation failure.
+   *
+   * Synchronous path:
+   *   1. Look up the active rules for the tenant (cache then refresh).
+   *   2. Filter by trigger kind match + root condition tree.
+   *   3. For each match, insert a queued run row + hand off to dispatchAsync.
+   *
+   * The run row is committed before the action chain starts, so the
+   * contract test can see status='queued' immediately.
+   */
+  async fire(event: AutomationEvent): Promise<void> {
+    try {
+      const eid = event.enterpriseId;
+      const rules = await this.getActiveRulesFor(eid);
+      const candidates = rules
+        .filter((r) => r.isActive)
+        .filter((r) => r.trigger.kind === event.kind)
+        .sort((a, b) => b.priority - a.priority);
+
+      for (const rule of candidates) {
+        if (!conditionsMatch(rule.conditions, event)) {
+          // Record a no-op run so the audit trail shows the trigger was seen.
+          const run = await this.createRun(
+            eid,
+            rule.id,
+            event.lead?.id ?? null,
+            event.payload,
+            event.correlationId ?? null,
+          );
+          await this.updateRunStatus(eid, run.id, 'skipped', 'root-conditions-failed');
+          continue;
+        }
+        const run = await this.createRun(
+          eid,
+          rule.id,
+          event.lead?.id ?? null,
+          event.payload,
+          event.correlationId ?? null,
+        );
+        // Hand off the action chain to a microtask so the caller is not blocked.
+        // The run row is already committed; contract tests can observe it.
+        this.dispatchAsync(rule, run.id, event);
+      }
+    } catch (err) {
+      console.warn(
+        '[automation] fire failed:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  /**
+   * Test a single rule synchronously: fire-and-await the dispatch so the
+   * contract test can read the run/step rows immediately. Does NOT throw.
+   * Returns the runId (or null on early failure).
+   */
+  async testRule(eid: string, ruleId: string, payload: Record<string, unknown>): Promise<string | null> {
+    try {
+      const rule = await this.getRule(eid, ruleId);
+      if (!rule) return null;
+      const run = await this.createRun(eid, rule.id, null, payload, `test-${ruleId}`);
+      await this.dispatchAsync(rule, run.id, {
+        kind: rule.trigger.kind,
+        enterpriseId: eid,
+        payload,
+        correlationId: `test-${ruleId}`,
+      });
+      return run.id;
+    } catch (err) {
+      console.warn(
+        '[automation] testRule failed:',
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Fire-and-forget the action chain for a run. Writes a 'running' state,
+   * executes each action, updates the run to 'success' or 'failed'.
+   * Catches every action's error so a single bad action doesn't abort the
+   * chain (A4.3: actions are best-effort; run captures per-step outcomes).
+   */
+  private dispatchAsync(rule: AutomationRule, runId: string, event: AutomationEvent): void {
+    const execute = async (): Promise<void> => {
+      const startedAt = Date.now();
+      const eid = rule.enterpriseId;
+      await this.updateRunStatus(eid, runId, 'running');
+      let ok = true;
+      let lastError: string | null = null;
+      for (let i = 0; i < rule.actions.length; i++) {
+        const action = rule.actions[i]!;
+        const t0 = Date.now();
+        try {
+          const ctx: ActionExecutorContext = {
+            enterpriseId: eid,
+            runId,
+            leadId: event.lead?.id ?? null,
+            lead: event.lead ?? null,
+            payload: event.payload,
+            correlationId: event.correlationId ?? null,
+          };
+          const out = await evaluateActionConfig(action.kind, action.config, ctx, {
+            withTenant: this.withTenant,
+          });
+          await this.addStep(eid, runId, i, action.kind, action.config, out, null, Date.now() - t0);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await this.addStep(
+            eid,
+            runId,
+            i,
+            action.kind,
+            action.config,
+            null,
+            message,
+            Date.now() - t0,
+          );
+          ok = false;
+          lastError = message;
+          // Continue with the next action — best-effort, not abort.
+        }
+      }
+      const finishedAt = Date.now();
+      const status: AutomationRunStatus = ok ? 'success' : 'failed';
+      await this.withTenant(eid, async (db) =>
+        db
+          .update(automationRun)
+          .set({
+            status,
+            finishedAt: new Date(finishedAt),
+            durationMs: finishedAt - startedAt,
+            error: lastError,
+          })
+          .where(eq(automationRun.id, runId)),
+      );
+      // Bump rule-level last/next run for schedule rules.
+      if (rule.trigger.kind === 'schedule' && rule.schedule) {
+        await this.withTenant(eid, async (db) =>
+          db
+            .update(automation)
+            .set({
+              lastRunAt: new Date(),
+              nextRunAt: nextCronTick(rule.schedule!.cron) ?? null,
+            })
+            .where(eq(automation.id, rule.id)),
+        );
+      }
+    };
+
+    // setImmediate keeps the request response unblocked; the chain runs in
+    // a microtask window after the controller returns.
+    setImmediate(() => {
+      execute().catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn('[automation] dispatchAsync crashed:', msg);
+        this.updateRunStatus(rule.enterpriseId, runId, 'failed', msg).catch(() => {
+          /* best effort */
+        });
+      });
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Conditions evaluator
+// ---------------------------------------------------------------------------
+
+/**
+ * Lightweight condition-tree evaluator. Resolves dotted paths against the
+ * event payload (and the lead snapshot when present), then applies the op.
+ * Returns true when the tree is empty/absent (default = match anything).
+ */
+export function conditionsMatch(
+  tree: AutomationConditionTree | null | undefined,
+  event: AutomationEvent,
+): boolean {
+  if (!tree || !Array.isArray(tree.children) || tree.children.length === 0) return true;
+  const facts: Record<string, unknown> = { ...(event.payload ?? {}) };
+  if (event.lead) {
+    facts.lead = {
+      id: event.lead.id,
+      pipelineId: event.lead.pipelineId,
+      stageId: event.lead.stageId,
+      ownerUserId: event.lead.ownerUserId,
+      assignedTeamMemberId: event.lead.assignedTeamMemberId,
+      source: event.lead.source,
+      score: event.lead.score,
+      tags: event.lead.tags,
+      fields: event.lead.customFields,
+    };
+  }
+  return evalGroup(tree, facts);
+}
+
+function evalGroup(
+  tree: AutomationConditionTree,
+  facts: Record<string, unknown>,
+): boolean {
+  const results = tree.children.map((child) => {
+    if ('combinator' in child && child.combinator) {
+      return evalGroup(child as AutomationConditionTree, facts);
+    }
+    return evalLeaf(child as AutomationConditionLeaf, facts);
+  });
+  if (tree.combinator === 'or') return results.some(Boolean);
+  return results.every(Boolean);
+}
+
+function evalLeaf(leaf: AutomationConditionLeaf, facts: Record<string, unknown>): boolean {
+  const value = readPath(facts, leaf.field);
+  switch (leaf.op) {
+    case 'eq':
+      return value === leaf.value;
+    case 'neq':
+      return value !== leaf.value;
+    case 'gt':
+      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) > (toNum(leaf.value) as number);
+    case 'gte':
+      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) >= (toNum(leaf.value) as number);
+    case 'lt':
+      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) < (toNum(leaf.value) as number);
+    case 'lte':
+      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) <= (toNum(leaf.value) as number);
+    case 'in':
+      return Array.isArray(leaf.value) && (leaf.value as unknown[]).includes(value);
+    case 'contains':
+      if (typeof value === 'string' && typeof leaf.value === 'string')
+        return value.includes(leaf.value);
+      if (Array.isArray(value)) return value.includes(leaf.value);
+      return false;
+    case 'exists':
+      return value !== undefined && value !== null;
+    default:
+      return true;
+  }
+}
+
+function readPath(obj: Record<string, unknown>, path: string): unknown {
+  const parts = path.split('.');
+  let cur: unknown = obj;
+  for (const p of parts) {
+    if (cur === null || cur === undefined) return undefined;
+    if (typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[p];
+  }
+  return cur;
+}
+
+function toNum(v: unknown): number | null {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+  return null;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s);
+}

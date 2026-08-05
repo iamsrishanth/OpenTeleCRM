@@ -1,7 +1,12 @@
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  schema: ['./src/schema.ts', './src/whatsapp-schema.ts', './src/telephony-schema.ts'],
+  schema: [
+    './src/schema.ts',
+    './src/whatsapp-schema.ts',
+    './src/telephony-schema.ts',
+    './src/automation-schema.ts',
+  ],
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {

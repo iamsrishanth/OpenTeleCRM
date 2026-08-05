@@ -7,6 +7,8 @@ import { action, actionType, lead, user } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { actionLogged } from '../automation/events.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -49,6 +51,7 @@ export class ActionsController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -177,6 +180,13 @@ export class ActionsController {
             resourceType: 'action',
             resourceId: createdId,
             after: { leadId, actionTypeId: r.typeId, note: todos[i]?.note ?? null },
+          });
+          const typeRow = types.find((t) => t.id === r.typeId);
+          actionLogged(this.automationService, eid, {
+            id: createdId,
+            leadId,
+            actionTypeId: r.typeId,
+            actionTypeCode: typeRow?.code,
           });
         }
       }

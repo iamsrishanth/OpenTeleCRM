@@ -19,6 +19,7 @@
     "@opentelecrm/contracts": "workspace:*",
     "@opentelecrm/core-domain": "workspace:*",
     "@opentelecrm/db": "workspace:*",
+    "@opentelecrm/rule-engine": "workspace:*",
     "@opentelecrm/telephony": "workspace:*",
     "@opentelecrm/whatsapp": "workspace:*",
     "dotenv": "^16.4.7",

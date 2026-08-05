@@ -29,8 +29,8 @@ beforeAll(async () => {
   process.env[ENV_KEY] = SECRET;
   app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
   app.setGlobalPrefix('/autoupdate/v2', { exclude: ['/health'] });
-  await app.listen({ port: 3105, host: '127.0.0.1' });
-  base = 'http://127.0.0.1:3105';
+  await app.listen({ port: 3108, host: '127.0.0.1' });
+  base = 'http://127.0.0.1:3108';
 });
 
 afterAll(async () => {

@@ -134,6 +134,16 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/rule-engine:
+    dependencies:
+      '@opentelecrm/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   services/api:
     dependencies:
       '@nestjs/common':
@@ -154,6 +164,9 @@ importers:
       '@opentelecrm/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@opentelecrm/rule-engine':
+        specifier: workspace:*
+        version: link:../../packages/rule-engine
       '@opentelecrm/telephony':
         specifier: workspace:*
         version: link:../telephony

@@ -10,9 +10,10 @@ import { MetaModule } from './sync/meta.module.js';
 import { SyncModule } from './sync/sync.module.js';
 import { WhatsappModule } from './whatsapp/whatsapp.module.js';
 import { TelephonyModule } from './telephony/telephony.module.js';
+import { AutomationModule } from './automation/automation.module.js';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule, TelephonyModule],
+  imports: [DatabaseModule, AuditModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule, TelephonyModule, AutomationModule],
   controllers: [HealthController, MetadataController],
 })
 export class AppModule {}

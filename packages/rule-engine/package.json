@@ -1,0 +1,26 @@
+{
+  "name": "@opentelecrm/rule-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "test": "echo \"rule-engine: pure TS evaluator, tested via services/api contract tests in a follow-up\""
+  },
+  "dependencies": {
+    "@opentelecrm/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

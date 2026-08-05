@@ -7,6 +7,8 @@ import { callback, lead } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { callbackDue } from '../automation/events.js';
 import { resolveCallbackDue } from './callback-time.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
@@ -36,6 +38,7 @@ export class CallbacksController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -115,6 +118,16 @@ export class CallbacksController {
         resourceId: row.id,
         after: { id: row.id, leadId, dueAt: row.dueAt.toISOString(), status: row.status },
       });
+      // Fire callback_due when the new callback is already due (or due
+      // within the same minute). This lets "create callback" trigger an
+      // automation that immediately reschedules the lead.
+      if (row.dueAt.getTime() <= Date.now() + 60_000) {
+        callbackDue(this.automationService, eid, {
+          id: row.id,
+          leadId,
+          dueAt: row.dueAt,
+        });
+      }
       return { id: row.id, dueAt: row.dueAt.toISOString(), status: row.status };
     });
   }

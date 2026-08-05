@@ -7,6 +7,8 @@ import { lead, leadField } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { leadCreated, leadUpdated } from '../automation/events.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -60,6 +62,7 @@ export class LeadsController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -219,6 +222,12 @@ export class LeadsController {
           before: existing[0],
           after: { ...existing[0], ...base },
         });
+        leadUpdated(
+          this.automationService,
+          eid,
+          { ...existing[0], ...base },
+          existing[0],
+        );
         return {
           status: 'UPDATED',
           leadId: existing[0].id,
@@ -249,6 +258,17 @@ export class LeadsController {
         resourceType: 'lead',
         resourceId: lid,
         after: { id: lid, ...base },
+      });
+      leadCreated(this.automationService, eid, {
+        id: lid,
+        pipelineId: dto.pipelineId ?? null,
+        stageId: dto.stageId ?? null,
+        ownerUserId: dto.ownerUserId ?? null,
+        assignedTeamMemberId: null,
+        source: dto.source ?? null,
+        score: dto.score ?? null,
+        tags: dto.tags ?? [],
+        customFields: cleanCustom,
       });
       return {
         status: 'CREATED',
@@ -334,6 +354,16 @@ export class LeadsController {
         before: existing[0],
         after: { ...existing[0], ...set },
       });
+      leadUpdated(
+        this.automationService,
+        eid,
+        {
+          ...existing[0],
+          ...set,
+        },
+        existing[0],
+        Object.keys(set).filter((k) => k !== 'updatedAt' && k !== 'customFields'),
+      );
       return { status: 'UPDATED', leadId, id: leadId, fields };
     });
   }

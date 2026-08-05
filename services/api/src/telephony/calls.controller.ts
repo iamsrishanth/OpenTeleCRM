@@ -19,6 +19,8 @@ import type { CallDirection, CallDisposition, CallStatus } from '@opentelecrm/co
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { callEnded } from '../automation/events.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -78,6 +80,7 @@ export class CallsController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -200,6 +203,15 @@ export class CallsController {
       resourceType: 'call',
       resourceId: row.id,
       after: this.serialize(row),
+    });
+
+    callEnded(this.automationService, eid, {
+      id: row.id,
+      leadId: row.leadId,
+      direction: row.direction as CallDirection,
+      status: row.status,
+      disposition: row.disposition,
+      durationSec: row.durationSec ?? 0,
     });
 
     return this.serialize(row);
