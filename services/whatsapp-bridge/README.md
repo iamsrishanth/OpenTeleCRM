@@ -56,7 +56,7 @@ journalctl -u opentelecrm-whatsapp-bridge -f
 
 | Var | Default | Meaning |
 |---|---|---|
-| PORT | 3000 | HTTP port (bind 0.0.0.0) |
+| PORT | 3098 | HTTP port (bind 0.0.0.0). 3098 avoids the Hermes gateway bridge's 3000 on this host |
 | SESSION_DIR | .data/bridge-session | Baileys file-backed session dir |
 | WHATSAPP_PAIRING_CODE | (empty) | phone to pair via code (no +); empty = QR |
 | WAIT_FOR_LINK | true | hold for the link on boot |

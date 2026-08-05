@@ -39,7 +39,7 @@ import {
 } from '@whiskeysockets/baileys'
 import qrcode from 'qrcode-terminal'
 
-const PORT = Number(process.env.PORT ?? 3000)
+const PORT = Number(process.env.PORT ?? 3098)
 const SESSION_DIR = process.env.SESSION_DIR ?? join(process.cwd(), '.data', 'bridge-session')
 const PAIRING_PHONE = (process.env.WHATSAPP_PAIRING_CODE ?? '').replace(/[^0-9]/g, '')
 const WAIT_FOR_LINK = (process.env.WAIT_FOR_LINK ?? 'true') !== 'false'
