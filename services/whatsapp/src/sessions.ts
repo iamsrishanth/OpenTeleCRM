@@ -11,7 +11,7 @@ import type { WhatsAppProvider } from '@opentelecrm/contracts';
 import { MockWhatsAppProvider } from './providers/mock.provider.js';
 
 /** Drivers the provider registry can construct. */
-export type WhatsAppDriver = 'mock' | 'wwebjs' | 'baileys' | 'cloud-api';
+export type WhatsAppDriver = 'mock' | 'wwebjs' | 'baileys' | 'hermes-bridge' | 'cloud-api';
 
 const sessions = new Map<string, WhatsAppProvider>();
 
@@ -29,6 +29,9 @@ export async function providerFor(
   } else if (kind === 'baileys') {
     const { BaileysWhatsAppProvider } = await import('./providers/baileys.provider.js');
     provider = new BaileysWhatsAppProvider();
+  } else if (kind === 'hermes-bridge') {
+    const { HermesBridgeProvider } = await import('./providers/hermes-bridge.provider.js');
+    provider = new HermesBridgeProvider();
   } else {
     provider = new MockWhatsAppProvider();
   }
@@ -56,7 +59,7 @@ export function dropSession(agentSessionId: string): void {
  */
 export function resolveWhatsappDriver(): WhatsAppDriver {
   const d = process.env.WHATSAPP_DRIVER;
-  return d === 'wwebjs' || d === 'baileys' ? d : 'mock';
+  return d === 'wwebjs' || d === 'baileys' || d === 'hermes-bridge' ? d : 'mock';
 }
 
 export function resolveAgentSessionId(eid: string, driver: WhatsAppDriver): string {

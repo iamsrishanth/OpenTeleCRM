@@ -43,7 +43,7 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A2.1 | 1-Click WhatsApp | `services/whatsapp` mock + **baileys** drivers (`sendText`), API `POST /enterprise/{eid}/whatsapp/send` | Baileys (live, pairing-code), contracts | 🚧 | API + mock driver green; **live driver env-wired** (`WHATSAPP_DRIVER=baileys|wwebjs`, `WHATSAPP_SESSION_ID=cli`); pairing is the operator step: `pnpm --filter @opentelecrm/whatsapp pair -- --code <phone>` (Baileys native pairing code — no QR; wwebjs QR path kept but its pairing-code path is broken vs current WA Web) | `whatsapp-inbox.contract.test.ts` |
+| A2.1 | 1-Click WhatsApp | `services/whatsapp` mock + **baileys** + **hermes-bridge** drivers (`sendText`), API `POST /enterprise/{eid}/whatsapp/send` | Baileys (live, pairing-code) / Hermes gateway bridge (live, outbound), contracts | ✅ | API + mock driver green; **live outbound verified end-to-end** via the `hermes-bridge` driver (rides the already-paired local Hermes Baileys bridge — business/smba numbers reject fresh waweb pairing with 401, so the bridge path is the operator answer; outbound only, inbound deliberately not consumed from the shared bridge queue). Direct Baileys pairing remains for consumer numbers (`pair -- --code <phone>`) | `whatsapp-inbox.contract.test.ts` + `hermes-bridge.test.ts` (7 suites) |
 | A2.2 | Chat Sync | `wa_session`/`conversation`/`wa_message` tables, `InboxService` (persist + auto lead-attribution), `GET /whatsapp/conversations` + messages | Baileys (live), Drizzle | 🚧 | Mock path + persistence verified; live chat sync requires the paired Baileys session | `whatsapp-inbox.contract.test.ts` |
 | A2.3 | WhatsApp Cloud API | — (Meta Graph API adapter planned) | — | ❌ | Cloud-api driver is a stub in the provider interface; Meta WABA onboarding deferred | — |
 | A2.4 | Broadcast | `wa_broadcast` + `consent_ledger` tables, `POST /whatsapp/broadcasts` + `:id/start` + opt-out, recipients from leadIds | Drizzle, Baileys (live) | 🚧 | Mock-driver path green (no throttle/jitter — lives in the driver); real broadcast needs the paired session | `whatsapp-template-broadcast.contract.test.ts` |
@@ -161,7 +161,7 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 ||---|---|---|---|
 | F Foundation | 2 | 0 | 0 |
 | A1 Sales & Call | 4 (A1.1, A1.3, A1.5, A1.6) | 1 (A1.2) | 3 (A1.4, A1.7, A1.8) |
-| A2 WhatsApp | 3 🚧 (A2.1, A2.2, A2.4) | 0 | 5 |
+| A2 WhatsApp | 1 (A2.1) | 2 (A2.2, A2.4) | 5 |
 | A3 Lead Capture | 1 (A3.2 webhook) | 0 | 1 |
 | A4 Automation | 5 (A4.2, A4.3, A4.4, A4.5, A4.7) | 0 | 2 |
 | A5 Reports | 0 | 0 | 6 |
