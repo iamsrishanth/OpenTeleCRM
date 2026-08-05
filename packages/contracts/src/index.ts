@@ -71,7 +71,7 @@ export interface WhatsAppSessionStatus {
  * persistence and reconnect; the domain layer only sees this surface.
  */
 export interface WhatsAppProvider {
-  readonly kind: 'mock' | 'wwebjs' | 'baileys' | 'hermes-bridge' | 'cloud-api';
+  readonly kind: 'mock' | 'wwebjs' | 'baileys' | 'bridge' | 'cloud-api';
   readonly ownsSession: boolean;
 
   /** Connect + begin processing this number's session. Resolves a session status. */

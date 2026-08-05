@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenTeleCRM WhatsApp Bridge (Baileys, deploy-anywhere)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=opentelecrm
+Group=opentelecrm
+# Bridge session lives here (persists the paired WhatsApp credentials).
+ExecStart=/usr/bin/node /opt/opentelecrm/whatsapp-bridge/dist/bridge.js
+Restart=on-failure
+RestartSec=5
+Environment=PORT=3000
+Environment=SESSION_DIR=/var/lib/opentelecrm-whatsapp/session
+# Optional: restrict inbound to known numbers (comma-separated, no +).
+# Environment=ALLOWED_USERS=916303456984,918465067156
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
