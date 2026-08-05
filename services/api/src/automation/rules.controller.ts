@@ -23,11 +23,13 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { AutomationService } from './automation.service.js';
+import { AutomationMeter } from './meter.js';
 import type { CreateRuleDto, UpdateRuleDto } from './types.js';
 
 function assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -43,7 +45,10 @@ function bad(message: string, code = 'VALIDATION_ERROR'): HttpException {
 
 @Controller('enterprise/:eid/automations')
 export class RulesController {
-  constructor(@Inject(AutomationService) private readonly service: AutomationService) {}
+  constructor(
+    @Inject(AutomationService) private readonly service: AutomationService,
+    @Inject(AutomationMeter) private readonly meter: AutomationMeter,
+  ) {}
 
   @Post()
   async create(
@@ -170,5 +175,37 @@ export class RulesController {
       );
     }
     return { runId: newRunId };
+  }
+
+  // -------------------------------------------------------------------------
+  // A4.7 quota metering (D4 divergence fix) — observable per-tenant limiter.
+  // -------------------------------------------------------------------------
+
+  @Get('usage')
+  async usage(@Param('eid') eid: string, @Req() req: FastifyRequest) {
+    assertTenant(req, eid);
+    const data = await this.meter.status(eid);
+    return { data };
+  }
+
+  @Get('quota')
+  async quotaGet(@Param('eid') eid: string, @Req() req: FastifyRequest) {
+    assertTenant(req, eid);
+    return { data: { rateLimitPerMinute: await this.meter.limitFor(eid) } };
+  }
+
+  @Put('quota')
+  async quotaSet(
+    @Param('eid') eid: string,
+    @Req() req: FastifyRequest,
+    @Body() body: { rateLimitPerMinute?: number } | undefined,
+  ) {
+    assertTenant(req, eid);
+    const n = Number(body?.rateLimitPerMinute);
+    if (!Number.isFinite(n) || n < 1) {
+      throw bad('rateLimitPerMinute must be a positive integer');
+    }
+    const rateLimitPerMinute = await this.meter.setLimit(eid, n);
+    return { data: { rateLimitPerMinute } };
   }
 }

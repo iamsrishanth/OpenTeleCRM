@@ -86,7 +86,7 @@ export interface AutomationRule {
   updatedAt: Date;
 }
 
-export type AutomationRunStatus = 'queued' | 'running' | 'success' | 'failed' | 'skipped';
+export type AutomationRunStatus = 'queued' | 'running' | 'success' | 'failed' | 'skipped' | 'throttled';
 
 export interface AutomationRun {
   id: string;

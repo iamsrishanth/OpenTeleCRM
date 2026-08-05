@@ -50,6 +50,7 @@ import type {
 } from './types.js';
 import { conditionsMatch, type ConditionFacts } from './conditions.js';
 import { nextCronTick } from './cron.js';
+import { AutomationMeter } from './meter.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -90,6 +91,7 @@ export class AutomationService implements OnModuleInit {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationMeter) private readonly meter: AutomationMeter,
   ) {}
 
   /**
@@ -328,6 +330,8 @@ export class AutomationService implements OnModuleInit {
     leadId: string | null,
     triggerPayload: Record<string, unknown>,
     correlationId: string | null,
+    status: AutomationRunStatus = 'queued',
+    error: string | null = null,
   ): Promise<AutomationRun> {
     const [row] = await this.withTenant(eid, async (db) =>
       db
@@ -336,12 +340,16 @@ export class AutomationService implements OnModuleInit {
           enterpriseId: eid,
           automationId: ruleId,
           leadId: leadId ?? null,
-          status: 'queued',
+          status,
           correlationId: correlationId ?? null,
           triggerPayload,
           resolvedContext: {},
           stepsExecuted: 0,
           conditionsMatched: true,
+          ...(error ? { error } : {}),
+          // Throttled runs are immediately terminal — the limiter's own
+          // bookkeeping row, not a dispatch.
+          ...(status === 'throttled' ? { finishedAt: new Date() } : {}),
         })
         .returning(),
     );
@@ -374,7 +382,7 @@ export class AutomationService implements OnModuleInit {
     if (status === 'running') {
       set.startedAt = new Date();
     }
-    if (status === 'success' || status === 'failed' || status === 'skipped') {
+    if (status === 'success' || status === 'failed' || status === 'skipped' || status === 'throttled') {
       set.finishedAt = new Date();
     }
     if (error !== undefined) set.error = error;
@@ -538,6 +546,25 @@ export class AutomationService implements OnModuleInit {
         .filter((r) => r.isActive)
         .filter((r) => r.trigger.kind === event.kind)
         .sort((a, b) => b.priority - a.priority);
+
+      // A4.7 — per-tenant rate limiter (D4 divergence fix). Checked once per
+      // fire: when the tenant is over its runs/minute ceiling, every matched
+      // rule records a visible 'throttled' run and nothing dispatches. The
+      // throttle is observable in the run log — never a silent drop.
+      if (candidates.length > 0 && !(await this.meter.canRun(eid))) {
+        for (const rule of candidates) {
+          await this.createRun(
+            eid,
+            rule.id,
+            event.lead?.id ?? null,
+            event.payload,
+            event.correlationId ?? null,
+            'throttled',
+            'automation rate limit exceeded (runs/min ceiling)',
+          );
+        }
+        return;
+      }
 
       for (const rule of candidates) {
         // Flat facts: trigger payload fields are top-level (e.g. 'toStageId',

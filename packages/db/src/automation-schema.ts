@@ -21,7 +21,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { lead, user } from './schema.js';
+import { lead, user, enterprise } from './schema.js';
 
 const withTimestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -271,6 +271,26 @@ export type SequenceRow = typeof sequence.$inferSelect;
 export type SequenceStepRow = typeof sequenceStep.$inferSelect;
 export type SequenceRunRow = typeof sequenceRun.$inferSelect;
 
+/**
+ * A4.7 — per-tenant automation quota override (D4 divergence fix).
+ * Row exists only when the tenant overrides the env default
+ * AUTOMATION_RATE_LIMIT_PER_MINUTE. Community mode ships unlimited
+ * automations, but a documented + observable per-tenant rate limiter
+ * (runs per minute) prevents runaway activity. Enforcement writes a
+ * 'throttled' automation_run row so the throttle is visible in the run log.
+ */
+export const automationQuota = pgTable(
+  'automation_quota',
+  {
+    enterpriseId: uuid('enterprise_id')
+      .primaryKey()
+      .references(() => enterprise.id, { onDelete: 'cascade' }),
+    /** Max automation runs per minute for the tenant. */
+    rateLimitPerMinute: integer('rate_limit_per_minute').default(60).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
 /** Automation + sequences tenant tables — must be RLS-enforced with the core tables. */
 export const AUTOMATION_TENANT_TABLES = [
   automation,
@@ -279,4 +299,5 @@ export const AUTOMATION_TENANT_TABLES = [
   sequence,
   sequenceStep,
   sequenceRun,
+  automationQuota,
 ] as const;

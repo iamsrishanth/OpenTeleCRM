@@ -14,6 +14,7 @@ import { DatabaseModule } from '../db/database.module.js';
 import { AuditModule } from '../audit/audit.module.js';
 import { ActionDispatcher, evaluateActionConfig } from './dispatcher.js';
 import { AutomationService } from './automation.service.js';
+import { AutomationMeter } from './meter.js';
 import { AutomationScheduler } from './scheduler.js';
 import { RulesController } from './rules.controller.js';
 import { DistributionController } from './distribution.controller.js';
@@ -26,8 +27,8 @@ export type { AutomationEvent, AutomationRule, AutomationRun } from './types.js'
 @Global()
 @Module({
   imports: [DatabaseModule, AuditModule],
-  providers: [AutomationService, ActionDispatcher, AutomationScheduler],
+  providers: [AutomationService, ActionDispatcher, AutomationScheduler, AutomationMeter],
   controllers: [RulesController, DistributionController, WebhookController],
-  exports: [AutomationService, ActionDispatcher],
+  exports: [AutomationService, ActionDispatcher, AutomationMeter],
 })
 export class AutomationModule {}
