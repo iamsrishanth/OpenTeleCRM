@@ -62,12 +62,15 @@ export interface AutomationRule {
   enterpriseId: string
   name: string
   description: string | null
+  category?: string
   trigger: AutomationTrigger
   conditions: AutomationCondition | null
   actions: AutomationAction[]
-  schedule: { cron?: string; timezone?: string } | null
+  schedule: { cron?: string; timezone?: string; runAt?: string } | null
   isActive: boolean
   priority: number
+  lastRunAt?: string | null
+  nextRunAt?: string | null
   createdAt: string
   updatedAt: string
 }

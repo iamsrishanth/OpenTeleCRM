@@ -152,4 +152,23 @@ export class RulesController {
     }
     return { runId };
   }
+
+  @Post(':id/runs/:runId/replay')
+  @HttpCode(200)
+  async replay(
+    @Param('eid') eid: string,
+    @Param('id') id: string,
+    @Param('runId') runId: string,
+    @Req() req: FastifyRequest,
+  ) {
+    assertTenant(req, eid);
+    const newRunId = await this.service.replayRun(eid, id, runId);
+    if (!newRunId) {
+      throw new HttpException(
+        { error: { code: 'AUTOMATION_NOT_FOUND', message: 'Rule or run not found' } },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return { runId: newRunId };
+  }
 }

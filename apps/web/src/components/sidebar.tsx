@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import {
   BellRing,
   LayoutDashboard,
+  ListOrdered,
   LogOut,
   Megaphone,
   MessageSquare,
@@ -26,6 +27,7 @@ const NAV = [
   { href: '/inbox', label: 'Inbox', icon: MessageSquare },
   { href: '/dialer', label: 'Dialer', icon: PhoneCall },
   { href: '/automations', label: 'Automations', icon: Workflow },
+  { href: '/sequences', label: 'Sequences', icon: ListOrdered },
   { href: '/templates', label: 'Templates', icon: Megaphone },
   { href: '/broadcasts', label: 'Broadcasts', icon: BellRing },
   { href: '/callbacks', label: 'Callbacks', icon: PhoneCall },

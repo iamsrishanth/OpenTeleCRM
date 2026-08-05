@@ -20,6 +20,7 @@ import type { DbClient } from '@opentelecrm/db';
 import { automation } from '@opentelecrm/db';
 import { DB_PROVIDER } from '../db/database.module.js';
 import { AutomationService } from './automation.service.js';
+import { SequencesService } from '../sequences/sequences.service.js';
 
 @Injectable()
 export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
@@ -29,6 +30,7 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(AutomationService) private readonly service: AutomationService,
+    @Inject(SequencesService) private readonly sequences: SequencesService,
   ) {}
 
   onModuleInit(): void {
@@ -73,6 +75,17 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
         correlationId: r.id,
         payload: { firedAt: now.toISOString(), cron: r.schedule?.cron ?? null },
       });
+    }
+
+    // A2.8 — advance due drip-sequence steps (startedAt + delayDays*24h <= now).
+    // Best-effort: a sequence failure must never break the automation sweep.
+    try {
+      const res = await this.sequences.processDueSequences();
+      if (res.processed > 0) {
+        console.log(`[scheduler] processed ${res.processed} sequence run(s)`);
+      }
+    } catch (err) {
+      console.warn('[scheduler] sequence processing failed:', err);
     }
   }
 }

@@ -26,6 +26,7 @@ import { and, count, desc, eq, gte, sql, type SQL } from 'drizzle-orm';
 import type { DbClient } from '@opentelecrm/db';
 import { action, actionType, call, lead, teamMember, user } from '@opentelecrm/db';
 import type { AutomationAction, AutomationActionKind } from './types.js';
+import { conditionsMatch, type ConditionFacts } from './conditions.js';
 import { resolveCallbackDue } from '../telephony/callback-time.js';
 import { TENANT_WRAPPER, DB_PROVIDER } from '../db/database.module.js';
 import { Inject, Injectable } from '@nestjs/common';
@@ -301,15 +302,97 @@ const EXECUTORS: Record<
     return { userId, title, body, channel: String(config.channel ?? 'in_app') };
   },
 
-  // ---- Deferred kinds: write a step row with 'skipped' via the engine's
-  // normal path. The dispatcher returns a marker that the step gets a
-  // clear error so the contract test sees the chain proceeded.
+  // ---- P4b executors: delay / branch / http_request / webhook --------------
 
-  send_email: async () => ({ skipped: true, reason: 'not yet implemented' }),
-  webhook: async () => ({ skipped: true, reason: 'not yet implemented' }),
-  branch: async () => ({ skipped: true, reason: 'not yet implemented' }),
-  delay: async () => ({ skipped: true, reason: 'not yet implemented' }),
-  http_request: async () => ({ skipped: true, reason: 'not yet implemented' }),
+  delay: async (config) => {
+    // In-process wait between steps — this is what makes drip sequences work:
+    // [send_whatsapp, delay(1h), send_whatsapp, ...] keeps the run 'running'
+    // between actions. NOTE: chains live in the process memory; a restart
+    // drops them (Temporal durability is the roadmap answer, ADR-0007).
+    const raw = config.ms ?? (config.seconds !== undefined ? Number(config.seconds) * 1000 : undefined)
+      ?? (config.minutes !== undefined ? Number(config.minutes) * 60_000 : undefined)
+      ?? (config.hours !== undefined ? Number(config.hours) * 3_600_000 : undefined)
+      ?? 0;
+    const ms = Math.max(0, Math.min(Math.floor(Number(raw) || 0), 24 * 60 * 60 * 1000));
+    if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
+    return { sleptMs: ms };
+  },
+
+  branch: async (config, ctx) => {
+    // Evaluate a condition tree against the run context. Returns the verdict
+    // and — when stopChainOnFalse is set and the condition is false — a
+    // __stopChain marker that makes the dispatch loop halt the remaining
+    // actions (checked in AutomationService.dispatchAsync).
+    const tree = config.condition as Parameters<typeof conditionsMatch>[0] | undefined;
+    // Flat facts matching the engine's root-conditions shape: trigger payload
+    // fields at top level, lead snapshot under 'lead'.
+    const facts: ConditionFacts = { ...(ctx.payload ?? {}) };
+    if (ctx.lead) {
+      facts.lead = {
+        id: ctx.lead.id,
+        pipelineId: ctx.lead.pipelineId,
+        stageId: ctx.lead.stageId,
+        ownerUserId: ctx.lead.ownerUserId,
+        assignedTeamMemberId: ctx.lead.assignedTeamMemberId,
+        source: ctx.lead.source,
+        score: ctx.lead.score,
+        tags: ctx.lead.tags,
+        fields: ctx.lead.customFields,
+      };
+    }
+    const taken = conditionsMatch(tree, facts);
+    const stopOnFalse = config.stopChainOnFalse === true || config.stopChainOnFalse === 'true';
+    if (!taken && stopOnFalse) {
+      return { taken, stopChain: true, __stopChain: true, reason: 'branch condition false; chain stopped' };
+    }
+    return { taken, reason: taken ? 'branch condition true' : 'branch condition false' };
+  },
+
+  http_request: async (config) => {
+    // Generic outbound HTTP action (POST default). Used for webhook-style
+    // calls to external services. Best-effort: network errors surface as a
+    // failed step via the normal engine path (no swallow).
+    const url = String(config.url ?? '');
+    if (!url) throw new Error('http_request requires url');
+    const method = String(config.method ?? 'POST').toUpperCase();
+    const headers = (config.headers ?? {}) as Record<string, string>;
+    const body = config.body !== undefined ? JSON.stringify(config.body) : undefined;
+    const timeoutMs = Math.min(Number(config.timeoutMs ?? 10_000) || 10_000, 30_000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'content-type': 'application/json', ...headers },
+        body,
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      return {
+        status: res.status,
+        ok: res.ok,
+        body: text.slice(0, 2000),
+        truncated: text.length > 2000,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
+  // webhook action kind = outbound webhook call; same impl as http_request.
+  webhook: async (config) => {
+    const merged = { method: 'POST', ...config };
+    return EXECUTORS.http_request(merged, {
+      enterpriseId: '',
+      runId: '',
+      leadId: null,
+      lead: null,
+      payload: {},
+      correlationId: null,
+    } as ActionExecutorContext, null as unknown as ActionDispatcher);
+  },
+
+  send_email: async () => ({ skipped: true, reason: 'not yet implemented (no SMTP infra yet)' }),
 };
 
 // ---------------------------------------------------------------------------

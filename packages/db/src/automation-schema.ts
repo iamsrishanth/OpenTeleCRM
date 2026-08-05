@@ -173,13 +173,110 @@ export const automationStep = pgTable(
   ],
 );
 
+/**
+ * A drip sequence (A2.8) — a time-delayed chain of actions run against one
+ * lead. Unlike automations (event-driven rule chains), a sequence is a
+ * scheduled drip: each step fires at a delayDays offset from the run start
+ * (startedAt + delayDays * 24h), driven by the 60s scheduler tick.
+ *   sequence       — the drip definition (name + trigger config).
+ *   sequence_step  — ordered steps, each with a delay + action descriptor.
+ *   sequence_run   — one lead's execution of a sequence (currentStep cursor).
+ */
+export const sequence = pgTable(
+  'sequence',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    enterpriseId: uuid('enterprise_id').notNull(),
+    name: varchar('name', { length: 128 }).notNull(),
+    /** Optional description shown in the drip builder UI. */
+    description: text('description'),
+    isActive: boolean('is_active').default(true).notNull(),
+    /** Trigger config (e.g. {kind:'manual'} or {kind:'lead_created'}). */
+    triggerConfig: jsonb('trigger_config').$type<Record<string, unknown>>().default({}).notNull(),
+    ...withTimestamps,
+  },
+  (t) => [
+    index('seq_ent_idx').on(t.enterpriseId),
+    index('seq_ent_active_idx').on(t.enterpriseId, t.isActive),
+    index('seq_ent_created_idx').on(t.enterpriseId, t.createdAt),
+  ],
+);
+
+/**
+ * One ordered step in a drip. `delayDays` is relative to the run start:
+ * step fires when startedAt + delayDays*24h <= now. `action` is an action
+ * descriptor { kind, config } — the same kinds the automation engine's
+ * ActionDispatcher executes (A4.3 set + delay/branch/http_request).
+ */
+export const sequenceStep = pgTable(
+  'sequence_step',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sequenceId: uuid('sequence_id')
+      .notNull()
+      .references(() => sequence.id, { onDelete: 'cascade' }),
+    enterpriseId: uuid('enterprise_id').notNull(),
+    /** 0-based position in the drip. */
+    stepOrder: integer('step_order').notNull(),
+    /** Days after run start before this step fires (0 = immediate). */
+    delayDays: integer('delay_days').default(0).notNull(),
+    /** Action descriptor handed to the executor: { kind, config }. */
+    action: jsonb('action').$type<Record<string, unknown>>().default({}).notNull(),
+    ...withTimestamps,
+  },
+  (t) => [
+    index('seqstep_ent_idx').on(t.enterpriseId),
+    index('seqstep_ent_seq_idx').on(t.enterpriseId, t.sequenceId, t.stepOrder),
+  ],
+);
+
+/**
+ * One execution of a drip against a lead. `currentStep` is the cursor of
+ * the next step to execute (0-based). A run is 'success' once currentStep
+ * reaches the sequence's step count; 'failed' when a step's executor threw.
+ *   status: queued | running | success | failed
+ */
+export const sequenceRun = pgTable(
+  'sequence_run',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sequenceId: uuid('sequence_id')
+      .notNull()
+      .references(() => sequence.id, { onDelete: 'cascade' }),
+    enterpriseId: uuid('enterprise_id').notNull(),
+    /** Lead the drip acts on (null for tenant-wide / leadless runs). */
+    leadId: uuid('lead_id').references(() => lead.id, { onDelete: 'set null' }),
+    /** queued | running | success | failed */
+    status: varchar('status', { length: 16 }).default('queued').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** Index of the next step to execute (0-based cursor). */
+    currentStep: integer('current_step').default(0).notNull(),
+    error: text('error'),
+    ...withTimestamps,
+  },
+  (t) => [
+    index('seqrun_ent_idx').on(t.enterpriseId),
+    index('seqrun_ent_seq_idx').on(t.enterpriseId, t.sequenceId),
+    index('seqrun_ent_lead_idx').on(t.enterpriseId, t.leadId),
+    index('seqrun_ent_status_idx').on(t.enterpriseId, t.status),
+    index('seqrun_ent_started_idx').on(t.enterpriseId, t.startedAt),
+  ],
+);
+
 export type AutomationRow = typeof automation.$inferSelect;
 export type AutomationRunRow = typeof automationRun.$inferSelect;
 export type AutomationStepRow = typeof automationStep.$inferSelect;
+export type SequenceRow = typeof sequence.$inferSelect;
+export type SequenceStepRow = typeof sequenceStep.$inferSelect;
+export type SequenceRunRow = typeof sequenceRun.$inferSelect;
 
-/** Automation tenant tables — must be RLS-enforced with the core tables. */
+/** Automation + sequences tenant tables — must be RLS-enforced with the core tables. */
 export const AUTOMATION_TENANT_TABLES = [
   automation,
   automationRun,
   automationStep,
+  sequence,
+  sequenceStep,
+  sequenceRun,
 ] as const;

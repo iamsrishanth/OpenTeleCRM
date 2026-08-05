@@ -12,7 +12,7 @@ import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import jwt from 'jsonwebtoken';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import {
   automation,
   automationRun,
@@ -611,5 +611,149 @@ describe('P4 automation engine — (g) run history endpoint', () => {
       { headers: auth(OTHER_ENTERPRISE_ID) },
     );
     expect([404, 500]).toContain(attempt.status);
+  });
+});
+
+describe('P4 automation engine — (h) P4b executors + replay (Wave 2)', () => {
+  async function createRule(name: string, trigger: unknown, actions: unknown[], schedule?: unknown) {
+    const create = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({
+        name,
+        trigger,
+        actions,
+        ...(schedule ? { schedule } : {}),
+      }),
+    });
+    expect(create.status).toBe(201);
+    return ((await create.json()) as { data: { id: string } }).data.id;
+  }
+
+  async function deleteRule(id: string) {
+    await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}`, {
+      method: 'DELETE',
+      headers: auth(),
+    });
+  }
+
+  async function testFire(id: string, payload: Record<string, unknown>) {
+    const res = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}/test`, {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({ payload }),
+    });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { runId: string }).runId;
+  }
+
+  it('branch(condition false, stopChainOnFalse) halts the remaining actions', async () => {
+    const id = await createRule(
+      `contract-${Date.now()}-branch`,
+      { kind: 'lead_created', config: {} },
+      [
+        {
+          kind: 'branch',
+          config: {
+            condition: { combinator: 'and', children: [{ field: 'triggered', op: 'eq', value: 'yes' }] },
+            stopChainOnFalse: true,
+          },
+        },
+        { kind: 'update_field', config: { apiName: 'score', value: 99 } },
+      ],
+    );
+    try {
+      const runId = await testFire(id, { triggered: 'no' });
+      const res = await waitForRunStatus(ENTERPRISE_ID, runId, ['success', 'failed']);
+      expect(res.status).toBe('success');
+      // Chain must have stopped after the branch step — update_field never ran.
+      expect(res.steps).toBe(1);
+    } finally {
+      await deleteRule(id);
+    }
+  });
+
+  it('delay + http_request executors run in-chain and hit the local health endpoint', async () => {
+    const id = await createRule(
+      `contract-${Date.now()}-delayhttp`,
+      { kind: 'lead_created', config: {} },
+      [
+        { kind: 'delay', config: { ms: 10 } },
+        { kind: 'http_request', config: { url: `http://127.0.0.1:${PORT}/health`, method: 'GET' } },
+      ],
+    );
+    try {
+      const runId = await testFire(id, {});
+      const res = await waitForRunStatus(ENTERPRISE_ID, runId, ['success', 'failed']);
+      expect(res.status).toBe('success');
+      expect(res.steps).toBe(2);
+
+      const steps = await withTenant(ENTERPRISE_ID, async (tx) =>
+        tx
+          .select()
+          .from(automationStep)
+          .where(eq(automationStep.runId, runId))
+          .orderBy(asc(automationStep.order)),
+      );
+      const httpStep = steps.find((s) => s.kind === 'http_request');
+      expect(httpStep).toBeTruthy();
+      expect((httpStep!.output as { status?: number }).status).toBe(200);
+      const delayStep = steps.find((s) => s.kind === 'delay');
+      expect((delayStep!.output as { sleptMs?: number }).sleptMs).toBeGreaterThanOrEqual(10);
+    } finally {
+      await deleteRule(id);
+    }
+  });
+
+  it('POST /:id/runs/:runId/replay re-fires the rule into a new run', async () => {
+    const id = await createRule(
+      `contract-${Date.now()}-replay`,
+      { kind: 'lead_created', config: {} },
+      [{ kind: 'update_field', config: { apiName: 'score', value: 5 } }],
+    );
+    try {
+      const firstRun = await testFire(id, {});
+      await waitForRunStatus(ENTERPRISE_ID, firstRun, ['success', 'failed']);
+
+      const replay = await fetch(
+        `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}/runs/${firstRun}/replay`,
+        { method: 'POST', headers: auth(), body: JSON.stringify({}) },
+      );
+      expect(replay.status).toBe(200);
+      const replayBody = (await replay.json()) as { runId: string };
+      expect(replayBody.runId).toBeTruthy();
+      expect(replayBody.runId).not.toBe(firstRun);
+
+      const runs = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}/runs`, {
+        headers: auth(),
+      });
+      const runsBody = (await runs.json()) as { data: { id: string }[] };
+      expect(runsBody.data.length).toBeGreaterThanOrEqual(2);
+      expect(runsBody.data[0]!.id).toBe(replayBody.runId);
+    } finally {
+      await deleteRule(id);
+    }
+  });
+
+  it('schedule rules persist runAt one-shot config + nextRunAt', async () => {
+    const runAt = new Date(Date.now() + 86_400_000).toISOString();
+    const id = await createRule(
+      `contract-${Date.now()}-runat`,
+      { kind: 'schedule', config: {} },
+      [{ kind: 'notify_user', config: { title: 'one-shot', body: 'x' } }],
+      { runAt, timezone: 'Asia/Kolkata' },
+    );
+    try {
+      const one = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}`, {
+        headers: auth(),
+      });
+      const body = (await one.json()) as {
+        data: { schedule: { runAt?: string } | null; nextRunAt?: string | null };
+      };
+      expect(new Date(body.data.schedule?.runAt as string).toISOString()).toBe(runAt);
+      expect(body.data.nextRunAt).toBeTruthy();
+    } finally {
+      await deleteRule(id);
+    }
   });
 });

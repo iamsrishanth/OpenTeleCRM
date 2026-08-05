@@ -48,6 +48,7 @@ import type {
   CreateRuleDto,
   UpdateRuleDto,
 } from './types.js';
+import { conditionsMatch, type ConditionFacts } from './conditions.js';
 import { nextCronTick } from './cron.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
@@ -68,6 +69,7 @@ function rowToRule(r: typeof automation.$inferSelect): AutomationRule {
     actions: (r.actions ?? []) as unknown as AutomationAction[],
     schedule: (r.schedule as { cron: string; timezone?: string } | null) ?? null,
     assignmentScope: (r.assignmentScope as Record<string, unknown> | null) ?? null,
+    category: r.category ?? 'general',
     isActive: r.isActive,
     priority: r.priority,
     lastRunAt: r.lastRunAt ?? null,
@@ -125,7 +127,9 @@ export class AutomationService implements OnModuleInit {
     const triggerSpec: AutomationTriggerSpec = dto.trigger ?? { kind: 'manual' };
     const nextRunAt =
       triggerSpec.kind === 'schedule' && dto.schedule
-        ? nextCronTick(dto.schedule.cron)
+        ? (dto.schedule as { runAt?: string }).runAt
+          ? new Date((dto.schedule as { runAt?: string }).runAt as string)
+          : nextCronTick((dto.schedule as { cron: string }).cron)
         : null;
 
     const [row] = await this.withTenant(eid, async (db) =>
@@ -202,6 +206,37 @@ export class AutomationService implements OnModuleInit {
     }));
   }
 
+  /** Re-dispatch a previous run's actions with the same trigger payload. */
+  async replayRun(eid: string, ruleId: string, runId: string): Promise<string | null> {
+    const rule = await this.getRule(eid, ruleId);
+    if (!rule) return null;
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automationRun)
+        .where(and(eq(automationRun.enterpriseId, eid), eq(automationRun.id, runId)))
+        .limit(1),
+    );
+    const prior = rows[0];
+    if (!prior) return null;
+    const correlationId = `replay:${prior.id}`;
+    const newRun = await this.createRun(
+      eid,
+      rule.id,
+      prior.leadId ?? null,
+      prior.triggerPayload,
+      correlationId,
+    );
+    const event: AutomationEvent = {
+      kind: rule.trigger.kind,
+      enterpriseId: eid,
+      correlationId,
+      payload: prior.triggerPayload,
+    };
+    this.dispatchAsync(rule, newRun.id, event);
+    return newRun.id;
+  }
+
   async getRule(eid: string, id: string): Promise<AutomationRule | null> {
     const rows = await this.withTenant(eid, async (db) =>
       db
@@ -232,9 +267,14 @@ export class AutomationService implements OnModuleInit {
     if (dto.isActive !== undefined) set.isActive = dto.isActive;
     if (dto.priority !== undefined) set.priority = dto.priority;
 
-    // Re-arm schedule if the cron changed.
-    if (dto.schedule && typeof dto.schedule.cron === 'string') {
-      set.nextRunAt = nextCronTick(dto.schedule.cron) ?? null;
+    // Re-arm schedule if the cron/runAt changed.
+    if (dto.schedule && typeof dto.schedule === 'object') {
+      const sched = dto.schedule as { cron?: string; runAt?: string };
+      if (sched.runAt) {
+        set.nextRunAt = new Date(sched.runAt);
+      } else if (typeof sched.cron === 'string') {
+        set.nextRunAt = nextCronTick(sched.cron) ?? null;
+      }
     }
 
     const rows = await this.withTenant(eid, async (db) =>
@@ -500,7 +540,23 @@ export class AutomationService implements OnModuleInit {
         .sort((a, b) => b.priority - a.priority);
 
       for (const rule of candidates) {
-        if (!conditionsMatch(rule.conditions, event)) {
+        // Flat facts: trigger payload fields are top-level (e.g. 'toStageId',
+        // 'status'), the lead snapshot lives under 'lead'.
+        const condFacts: ConditionFacts = { ...(event.payload ?? {}) };
+        if (event.lead) {
+          condFacts.lead = {
+            id: event.lead.id,
+            pipelineId: event.lead.pipelineId,
+            stageId: event.lead.stageId,
+            ownerUserId: event.lead.ownerUserId,
+            assignedTeamMemberId: event.lead.assignedTeamMemberId,
+            source: event.lead.source,
+            score: event.lead.score,
+            tags: event.lead.tags,
+            fields: event.lead.customFields,
+          };
+        }
+        if (!conditionsMatch(rule.conditions, condFacts)) {
           // Record a no-op run so the audit trail shows the trigger was seen.
           const run = await this.createRun(
             eid,
@@ -586,6 +642,10 @@ export class AutomationService implements OnModuleInit {
             withTenant: this.withTenant,
           });
           await this.addStep(eid, runId, i, action.kind, action.config, out, null, Date.now() - t0);
+          // branch(..., stopChainOnFalse) halts the remaining chain.
+          if (out && typeof out === 'object' && (out as { __stopChain?: boolean }).__stopChain) {
+            break;
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           await this.addStep(
@@ -618,13 +678,19 @@ export class AutomationService implements OnModuleInit {
       );
       // Bump rule-level last/next run for schedule rules.
       if (rule.trigger.kind === 'schedule' && rule.schedule) {
+        const sched = rule.schedule as { cron?: string; runAt?: string };
+        const isOneShot = !sched.cron && !!sched.runAt;
         await this.withTenant(eid, async (db) =>
           db
             .update(automation)
-            .set({
-              lastRunAt: new Date(),
-              nextRunAt: nextCronTick(rule.schedule!.cron) ?? null,
-            })
+            .set(
+              isOneShot
+                ? { lastRunAt: new Date(), nextRunAt: null, isActive: false }
+                : {
+                    lastRunAt: new Date(),
+                    nextRunAt: nextCronTick(sched.cron as string) ?? null,
+                  },
+            )
             .where(eq(automation.id, rule.id)),
         );
       }
@@ -653,88 +719,6 @@ export class AutomationService implements OnModuleInit {
  * event payload (and the lead snapshot when present), then applies the op.
  * Returns true when the tree is empty/absent (default = match anything).
  */
-export function conditionsMatch(
-  tree: AutomationConditionTree | null | undefined,
-  event: AutomationEvent,
-): boolean {
-  if (!tree || !Array.isArray(tree.children) || tree.children.length === 0) return true;
-  const facts: Record<string, unknown> = { ...(event.payload ?? {}) };
-  if (event.lead) {
-    facts.lead = {
-      id: event.lead.id,
-      pipelineId: event.lead.pipelineId,
-      stageId: event.lead.stageId,
-      ownerUserId: event.lead.ownerUserId,
-      assignedTeamMemberId: event.lead.assignedTeamMemberId,
-      source: event.lead.source,
-      score: event.lead.score,
-      tags: event.lead.tags,
-      fields: event.lead.customFields,
-    };
-  }
-  return evalGroup(tree, facts);
-}
-
-function evalGroup(
-  tree: AutomationConditionTree,
-  facts: Record<string, unknown>,
-): boolean {
-  const results = tree.children.map((child) => {
-    if ('combinator' in child && child.combinator) {
-      return evalGroup(child as AutomationConditionTree, facts);
-    }
-    return evalLeaf(child as AutomationConditionLeaf, facts);
-  });
-  if (tree.combinator === 'or') return results.some(Boolean);
-  return results.every(Boolean);
-}
-
-function evalLeaf(leaf: AutomationConditionLeaf, facts: Record<string, unknown>): boolean {
-  const value = readPath(facts, leaf.field);
-  switch (leaf.op) {
-    case 'eq':
-      return value === leaf.value;
-    case 'neq':
-      return value !== leaf.value;
-    case 'gt':
-      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) > (toNum(leaf.value) as number);
-    case 'gte':
-      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) >= (toNum(leaf.value) as number);
-    case 'lt':
-      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) < (toNum(leaf.value) as number);
-    case 'lte':
-      return toNum(value) !== null && toNum(leaf.value) !== null && (toNum(value) as number) <= (toNum(leaf.value) as number);
-    case 'in':
-      return Array.isArray(leaf.value) && (leaf.value as unknown[]).includes(value);
-    case 'contains':
-      if (typeof value === 'string' && typeof leaf.value === 'string')
-        return value.includes(leaf.value);
-      if (Array.isArray(value)) return value.includes(leaf.value);
-      return false;
-    case 'exists':
-      return value !== undefined && value !== null;
-    default:
-      return true;
-  }
-}
-
-function readPath(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split('.');
-  let cur: unknown = obj;
-  for (const p of parts) {
-    if (cur === null || cur === undefined) return undefined;
-    if (typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
-}
-
-function toNum(v: unknown): number | null {
-  if (typeof v === 'number' && !Number.isNaN(v)) return v;
-  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
-  return null;
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isUuid(s: string): boolean {
   return UUID_RE.test(s);

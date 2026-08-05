@@ -77,6 +77,7 @@ export interface AutomationRule {
   actions: AutomationAction[];
   schedule?: { cron: string; timezone?: string } | null;
   assignmentScope?: Record<string, unknown> | null;
+  category?: string | null;
   isActive: boolean;
   priority: number;
   lastRunAt?: Date | null;

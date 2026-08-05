@@ -50,7 +50,7 @@ Column semantics:
 | A2.5 | Chatbot | — | — | ❌ | Flow builder + LLM fallback deferred to P2 follow-up / P4 | — |
 | A2.6 | Notifications | — | — | ❌ | Agent notification surface deferred (notifier service) | — |
 | A2.7 | Website widget | — (`apps/widget` empty placeholder) | — | ❌ | Widget SDK deferred | — |
-| A2.8 | Drip / sequences | — | — | ❌ | Sequences deferred to P4 automation | — |
+| A2.8 | Drip / sequences | `packages/db` (`sequence`/`sequence_step`/`sequence_run`, migration 0004), `services/api` (`sequences/` module: CRUD, start, process-due hook, 60s-tick integration), `apps/web/sequences` page | Drizzle, NestJS | ✅ | Steps with delayDays dispatch through the same action executors; in-process timing (Temporal durability is the roadmap answer, ADR-0007) | `sequences.contract.test.ts` (4 suites, green) |
 
 ---
 
@@ -67,12 +67,12 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A4.1 | Workflow builder (visual) | — (`apps/web/automations` — form-based rules UI shipped P4b: create/edit/test/run-history; drag-drop React Flow canvas remains roadmap) | React Flow (ADR-0019) | 🚧 | API-level rules engine + form-based rules UI; visual drag-drop canvas is the remaining roadmap step | `automation.contract.test.ts` + web smoke |
+| A4.1 | Workflow builder (visual) | `apps/web/automations/builder` — React Flow drag-drop canvas (triggers/conditions/actions → AutomationRule), edit mode via ?id= | React Flow (ADR-0019) | ✅ | Canvas compiles to the same rules API; form-based rules UI also ships (automations page) | `automation.contract.test.ts` + web smoke |
 | A4.2 | Trigger rules (field change, stage change, action) | `services/api` (`automation/rules.controller.ts` CRUD + `POST :id/test`, `automation/events.ts` — 9 event kinds: lead_created, lead_updated, lead_stage_changed, lead_field_changed, lead_assigned, call_ended, action_logged, callback_due, inbound_message), `packages/rule-engine` evaluator | Drizzle, NestJS, pure-TS rule-engine | ✅ | — | `automation.contract.test.ts` (CRUD + event fire + stage change suites) |
-| A4.3 | Action automation (call/WhatsApp/email tasks) | `services/api` (`automation/dispatcher.ts` — 6 executors: assign_lead, create_callback, send_whatsapp, update_field, move_stage, notify_user; send_email/webhook/branch/delay/http_request declared, `{skipped:true}` stubs) | Drizzle, NestJS | ✅ | Executors dispatch via the same provider abstractions (WhatsApp/telephony) | `automation.contract.test.ts` (event fire + stage change suites assert side effects) |
+| A4.3 | Action automation (call/WhatsApp/email tasks) | `services/api` (`automation/dispatcher.ts` — executors: assign_lead, create_callback, send_whatsapp, update_field, move_stage, notify_user, **delay, branch, http_request, webhook**; send_email stub) | Drizzle, NestJS | ✅ | Executors dispatch via the same provider abstractions (WhatsApp/telephony) | `automation.contract.test.ts` (event fire + stage change suites assert side effects) |
 | A4.4 | Scheduled / recurring automations | `services/api` (`automation/scheduler.ts` 60s cron tick, `automation/cron.ts` 5-field evaluator; `POST /automations/:id/test` fires a schedule) | Drizzle, NestJS | ✅ | In-process scheduler for v1; Temporal durability is the roadmap P4b decision (ADR-0007) | `automation.contract.test.ts` (schedule suite) |
 | A4.5 | Lead assignment rules | `services/api` (`automation/distribution.controller.ts` — `POST /lead/:leadId/distribute`, round-robin / least_loaded / skill_match with fair-share assignment counts) | Drizzle, NestJS | ✅ | — | `automation.contract.test.ts` (distribution suite) |
-| A4.6 | Workflow templates | — | — | ❌ | Seeded template automations are a roadmap P4b E2E gate | — |
+| A4.6 | Workflow templates | `packages/db/src/seed-templates.ts` — 10 seeded templates (category='template', isActive=false) per enterprise: Welcome WhatsApp, New Lead Notify, Round-robin Assignment, Stage-Change Callback, Callback Reminder, Webhook Enrich, Score-on-Create, Follow-up Schedule, etc.; `pnpm --filter @opentelecrm/db seed:templates` | Drizzle | ✅ | Templates install/activate from the automations UI (E2E-verified: activating Welcome WhatsApp fires a success run on lead create) | web E2E + `automation.contract.test.ts` |
 | A4.7 | Automation quota metering | — | — | ❌ | See Divergences §D4 — we ship unlimited + per-tenant rate limiter instead of TeleCRM's ambiguous quota | — |
 
 ---
