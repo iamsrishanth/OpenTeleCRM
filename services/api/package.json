@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.contract.config.ts",
     "test:contract": "vitest run --config vitest.contract.config.ts"
   },
   "dependencies": {

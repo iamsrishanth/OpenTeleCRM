@@ -19,7 +19,7 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| F1 | Multi-tenant foundation: every table enterprise-scoped, RLS enabled + FORCEd on all 11 tenant tables, `app.enterprise_id` session-variable policy, `withTenant()` txn wrapper | `packages/db` (`schema.ts`, `rls.ts`, migration `drizzle/0000_peaceful_speedball.sql`) | Drizzle ORM, node-postgres, PostgreSQL 16 | ✅ | — | `services/api/src/__tests__/metadata.contract.test.ts` (all suites run through RLS); no dedicated RLS unit test yet |
+| F1 | Multi-tenant foundation: every table enterprise-scoped, RLS enabled + FORCEd on all 24 tenant tables, `app.enterprise_id` session-variable policy, `withTenant()` txn wrapper | `packages/db` (`schema.ts`, `whatsapp-schema.ts`, `telephony-schema.ts`, `automation-schema.ts`, `rls.ts`, migrations `drizzle/0000…0003`) | Drizzle ORM, node-postgres, PostgreSQL 16/17 | ✅ | — | `services/api/src/__tests__/metadata.contract.test.ts` (all suites run through RLS); no dedicated RLS unit test yet |
 | F2 | Seed data: 1 enterprise, 3 users + team members (owner/admin/agent), 2 pipelines (Default Sales, Support), 20 custom fields (immutable `apiName`), 5,000 deterministic leads, system action types (note/call/whatsapp) | `packages/db` (`seed.ts`, `scripts/db/seed.sh`) | — | ✅ | — | run via `pnpm --filter @opentelecrm/db seed`; asserted by contract tests (custom-fields returns exactly 20) |
 
 ---
@@ -59,7 +59,7 @@ Column semantics:
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
 | A3.1 | Lead capture sources (26+: Facebook, Google, Instagram, WhatsApp, JustDial, Website, IndiaMART, Referral, …) | — (seed `SOURCES` array covers 8 demo sources on `lead.source`) | — | ❌ | Data model supports arbitrary sources today; ingestion connectors not built | — |
-| A3.2 | Inbound capture API / webhooks | — (planned: `services/api`) | — | ❌ | — | — |
+| A3.2 | Inbound capture API / webhooks | `services/api` (`automation/webhook.controller.ts` — public `POST /webhook/:tenantId/:name`, fires matching `webhook_received` automation, writes `automation_run` rows) | Drizzle, NestJS | ✅ | Public webhook surface doubles as the automation inbound trigger; generic capture-connector layer (P5 lead capture) not yet built | `automation.contract.test.ts` (webhook inbound suite) |
 
 ---
 
@@ -67,12 +67,12 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A4.1 | Workflow builder (visual) | — | — | ❌ | — | — |
-| A4.2 | Trigger rules (field change, stage change, action) | — | — | ❌ | — | — |
-| A4.3 | Action automation (call/WhatsApp/email tasks) | — | — | ❌ | — | — |
-| A4.4 | Scheduled / recurring automations | — | — | ❌ | — | — |
-| A4.5 | Lead assignment rules | — (planned: `team_member` availability/capacity fields exist) | — | ❌ | — | — |
-| A4.6 | Workflow templates | — | — | ❌ | — | — |
+| A4.1 | Workflow builder (visual) | — (`apps/web` React Flow builder — roadmap P4b) | React Flow (ADR-0019) | ❌ | API-level rules engine shipped; visual drag-drop canvas is the roadmap P4b step | — |
+| A4.2 | Trigger rules (field change, stage change, action) | `services/api` (`automation/rules.controller.ts` CRUD + `POST :id/test`, `automation/events.ts` — 9 event kinds: lead_created, lead_updated, lead_stage_changed, lead_field_changed, lead_assigned, call_ended, action_logged, callback_due, inbound_message), `packages/rule-engine` evaluator | Drizzle, NestJS, pure-TS rule-engine | ✅ | — | `automation.contract.test.ts` (CRUD + event fire + stage change suites) |
+| A4.3 | Action automation (call/WhatsApp/email tasks) | `services/api` (`automation/dispatcher.ts` — 6 executors: assign_lead, create_callback, send_whatsapp, update_field, move_stage, notify_user; send_email/webhook/branch/delay/http_request declared, `{skipped:true}` stubs) | Drizzle, NestJS | ✅ | Executors dispatch via the same provider abstractions (WhatsApp/telephony) | `automation.contract.test.ts` (event fire + stage change suites assert side effects) |
+| A4.4 | Scheduled / recurring automations | `services/api` (`automation/scheduler.ts` 60s cron tick, `automation/cron.ts` 5-field evaluator; `POST /automations/:id/test` fires a schedule) | Drizzle, NestJS | ✅ | In-process scheduler for v1; Temporal durability is the roadmap P4b decision (ADR-0007) | `automation.contract.test.ts` (schedule suite) |
+| A4.5 | Lead assignment rules | `services/api` (`automation/distribution.controller.ts` — `POST /lead/:leadId/distribute`, round-robin / least_loaded / skill_match with fair-share assignment counts) | Drizzle, NestJS | ✅ | — | `automation.contract.test.ts` (distribution suite) |
+| A4.6 | Workflow templates | — | — | ❌ | Seeded template automations are a roadmap P4b E2E gate | — |
 | A4.7 | Automation quota metering | — | — | ❌ | See Divergences §D4 — we ship unlimited + per-tenant rate limiter instead of TeleCRM's ambiguous quota | — |
 
 ---
@@ -103,8 +103,8 @@ Column semantics:
 | A6.6a | Metadata API (TeleCRM-parity REST): `GET /enterprise/{eid}/metadata`, `/custom-fields`, `/lead-stage-pipeline` (global prefix `/autoupdate/v2`), JWT/OIDC/API-token auth via global AuthGuard | `services/api` (`MetadataController`, `AuthGuard`) | NestJS, Fastify, Drizzle, jsonwebtoken | ✅ | — | `services/api/src/__tests__/metadata.contract.test.ts` (6 cases, green) |
 | A6.6c | Sync API (TeleCRM-parity REST): leads CRUD + upsert-by-identifier + search, actions batch CRUD + search (bare-numeric custom codes), team-members + state_change, custom-actions + custom-fields PATCH — all under `/autoupdate/v2/enterprise/{eid}` | `services/api` (`sync/leads.controller.ts`, `actions.controller.ts`, `team.controller.ts`, `meta.controller.ts`) | NestJS, Fastify, Drizzle | ✅ | Per-item status `CREATED|IGNORED|UPDATED|REJECTED` + `remarks[]` on batch; search = POST + 200 (not 201) | `services/api/src/__tests__/sync.contract.test.ts` (10 cases, green) |
 | A6.6d | Async API (fire-and-forget): `POST /enterprise/{eid}/autoupdatelead` → 200 + requestId; `?validate=true` dry-run (zero writes); `X-Strict-Mode: true` → 422; `ACTION_`-prefix normalization; `GET /enterprise/{eid}/ingest/:requestId` | `services/api` (`async/async.controller.ts`) | NestJS, Fastify, Drizzle | ✅ | Fixes TeleCRM silent-drop defect (divergence D1): dry-run + per-field outcomes; in-memory ingest log for now (queue persistence later) | `services/api/src/__tests__/async.contract.test.ts` (10 cases, green) |
-| A6.6b | MCP tool surface — 13 TeleCRM-parity tools: `get_workspace_identity`, `list_lead_fields`, `get_lead_field_schema`, `list_actions`, `get_action_schema`, `get_lead_stages_and_lost_reasons`, `list_team_members`, `fetch_lead`, `query_leads`, `fetch_lead_action`, `query_lead_actions`, `get_current_date`, `get_workspace_context`; Streamable HTTP transport (`POST /mcp`), all queries RLS-scoped | `services/mcp` | MCP TypeScript SDK, zod, Drizzle | ✅ | Dev mode reads enterprise from `MCP_ENTERPRISE_ID` env; OAuth 2.1 + PKCE + DCR gateway (Zitadel) lands in auth phase — tool surface is transport-agnostic. See Divergences §D3 | No automated tests yet — exercised manually via MCP client |
-| A6.7 | Audit log | `packages/db` (`audit_log`: actor, action, resource, before/after, ip) | Drizzle | 🚧 | Table + RLS in place; write path not implemented | — |
+| A6.6b | MCP tool surface — 13 TeleCRM-parity tools: `get_workspace_identity`, `list_lead_fields`, `get_lead_field_schema`, `list_actions`, `get_action_schema`, `get_lead_stages_and_lost_reasons`, `list_team_members`, `fetch_lead`, `query_leads`, `fetch_lead_action`, `query_lead_actions`, `get_current_date`, `get_workspace_context`; Streamable HTTP transport (`POST /mcp`), all queries RLS-scoped | `services/mcp` | MCP TypeScript SDK, zod, Drizzle | ✅ | Dev mode reads enterprise from `MCP_ENTERPRISE_ID` env; OAuth 2.1 + PKCE + DCR gateway (Zitadel) lands in auth phase — tool surface is transport-agnostic. See Divergences §D3 | `services/mcp/src/__tests__/mcp.contract.test.ts` (15 cases, green) |
+| A6.7 | Audit log | `packages/db` (`audit_log`: actor, action, resource, before/after, ip), `services/api` (`audit/audit.service.ts` — B5 write path, event hooks fire automation triggers after every audit write) | Drizzle, NestJS | ✅ | Write path landed; admin read/export UI deferred | `audit.contract.test.ts` (4 cases) |
 
 ---
 
@@ -158,18 +158,18 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 ## Status summary (today)
 
 | Area | ✅ | 🚧 | ❌ |
-|---|---|---|---|
+||---|---|---|---|
 | F Foundation | 2 | 0 | 0 |
 | A1 Sales & Call | 3 (A1.3, A1.5, A1.6) | 2 (A1.1, A1.2) | 3 (A1.4, A1.7, A1.8) |
 | A2 WhatsApp | 3 🚧 (A2.1, A2.2, A2.4) | 0 | 5 |
-| A3 Lead Capture | 0 | 0 | 2 |
-| A4 Automation | 0 | 0 | 7 |
+| A3 Lead Capture | 1 (A3.2 webhook) | 0 | 1 |
+| A4 Automation | 4 (A4.2, A4.3, A4.4, A4.5) | 0 | 3 |
 | A5 Reports | 0 | 0 | 6 |
-| A6 Customization & Admin | 6 (A6.1, A6.2, A6.5, A6.6, A6.6a, A6.6b, A6.6c, A6.6d) | 1 (A6.3, A6.4, A6.7) | 0 |
+| A6 Customization & Admin | 8 (A6.1, A6.2, A6.5, A6.6, A6.6a, A6.6b, A6.6c, A6.6d, A6.7) | 2 (A6.3, A6.4) | 0 |
 | A7 AI & Voice | 0 | 0 | 5 |
 | A8 Support & Onboarding | 0 | 0 | 3 |
 | B Plans & Billing | 0 | 0 | 3 |
 
-**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5). **P2 WhatsApp (Partial 🚧):** contracts + provider abstraction, mock + whatsapp-web.js drivers, unified inbox with auto lead-attribution, templates CRUD, broadcasts (create/start/opt-out) via mock driver — 43/43 contract tests, **17/17 Bruno collection green**. **P3 Telephony (Partial 🚧):** `TelephonyProvider` contract + call domain types (`packages/contracts`), telephony schema (`call`/`recording`/`callback`/`dnd_registry`, migration 0002, RLS-wired), `services/telephony` mock + asterisk-ari providers + pure dialer scoring, `services/api` telephony module (calls A1.3, caller-id A1.6, dialer A1.1, callbacks A1.5, recordings A1.2 partial), `infra/asterisk` PBX scaffold (ari.conf/pjsip.conf/extensions.conf/systemd) — 19/19 telephony contract tests green, **62/62 contract tests total**. Live Asterisk dialing (paired trunk) + the recording pipeline (MixMonitor → object storage) land in the PBX-wiring phase — see PLAN-P3.md. **Bruno collection (`collections/opentelecrm/`) runs green against the live API.** Real-number pairing is a documented CLI step (`pnpm --filter @opentelecrm/whatsapp pair`). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), audit-log write path (A6.7), WhatsApp cloud-api/chatbot/widget/notifications, telephony live-PBX dialing + recording pipeline (A1.1/A1.2). Everything in A1.4, A1.7, A1.8, A3–A5, A7, A8, B is not yet built.
+**Implemented and verified:** multi-tenant foundation + RLS (F1), seed data (F2), TeleCRM-parity metadata REST surface (A6.6a), 13-tool MCP surface (A6.6b), full Sync API (A6.6c), full Async API (A6.6d), API tokens with class enforcement (A6.6), custom fields / pipeline-stage / workspace settings read paths (A6.1, A6.2, A6.5), audit-log write path (A6.7). **P2 WhatsApp (Partial 🚧):** contracts + provider abstraction, mock + whatsapp-web.js drivers, unified inbox with auto lead-attribution, templates CRUD, broadcasts (create/start/opt-out) via mock driver — 43/43 contract tests + 14/14 whatsapp package unit tests. **P3 Telephony (Partial 🚧):** `TelephonyProvider` contract + call domain types, telephony schema (`call`/`recording`/`callback`/`dnd_registry`, migration 0002, RLS-wired), `services/telephony` mock + asterisk-ari providers + pure dialer scoring, `services/api` telephony module (calls A1.3, caller-id A1.6, dialer A1.1, callbacks A1.5, recordings A1.2 partial) — 11/11 telephony unit tests. **P4 Automation (✅ API-level):** rules engine (`packages/rule-engine` pure evaluator), `automation`/`automation_run`/`automation_step` schema (migration 0003, 24 tenant tables total), rules CRUD + `/:id/test`, 9 event kinds, 6 action executors (assign_lead, create_callback, send_whatsapp, update_field, move_stage, notify_user), lead distribution (round-robin/least_loaded/skill_match), public webhook trigger, 60s in-process scheduler — **75/75 API contract tests total** (9 files) + **15/15 MCP** + 11/11 telephony + 14/14 whatsapp. **Bruno collection (`collections/opentelecrm/`) runs green against the live API.** Real-number pairing is a documented CLI step (`pnpm --filter @opentelecrm/whatsapp pair`). Partial: roles enforcement (A6.3), team read/write admin UI (A6.4), WhatsApp cloud-api/chatbot/widget/notifications (A2.3/A2.5/A2.6/A2.7/A2.8), telephony live-PBX dialing + recording pipeline (A1.1/A1.2), automation visual builder + templates + quota metering (A4.1/A4.6/A4.7). Everything in A1.4, A1.7, A1.8, A3.1, A5, A7, A8, B is not yet built.
 
-_Last updated: 2026-08-04. Keep in sync with `services/api`, `services/mcp`, `packages/db` as features land._
+_Last updated: 2026-08-05. Keep in sync with `services/api`, `services/mcp`, `packages/db` as features land._

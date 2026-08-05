@@ -18,9 +18,10 @@ This document uses the C4 model: **L1 system context**, **L2 containers**,
 - **Build/dev tooling**: TypeScript 5.7, Biome 1.9 (lint/format), Vitest (API tests),
   tsc for typecheck. Bootstrap via `make bootstrap` → `provision install db-init db-migrate db-seed`.
 
-> Postgres note: the provisioner (`scripts/provision/debian.sh`) currently installs
-> **PostgreSQL 16**. The migration target is **17**; step the distro package when ready.
-> No Docker at any layer — binaries and systemd units only.
+> Postgres note: the provisioner (`scripts/provision/debian.sh`) installs
+> **PostgreSQL 16**; this host runs **17.10** (the migration target). Both are
+> supported by the migrations. No Docker at any layer — binaries and systemd
+> units only.
 
 ---
 
@@ -385,7 +386,7 @@ prod — RSAL concern), **NATS** (service messaging), **Meilisearch** (lead sear
 | Thing | Value |
 |-------|-------|
 | API HTTP | `:3005` (`services/api/dev.sh`, `PORT_OVERRIDE`) |
-| MCP HTTP | `:3100`, path `/mcp` (`services/mcp/dev.sh`) |
+| MCP HTTP | `:3100`, path `/mcp` (`services/mcp/dev.sh`; code default `MCP_PORT` is 3101 — dev.sh pins 3100) |
 | Postgres | `127.0.0.1:5432/opentelecrm` (role `opentelecrm`, non-owner) |
 | Node toolchain | v22.23.1 (nvm), `tsx` watch dev runner |
 | Bootstrap | `make bootstrap` / `setup` (no root; sudo-only steps) |

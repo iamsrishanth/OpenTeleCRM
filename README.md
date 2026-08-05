@@ -4,11 +4,11 @@
 
 | Surface | Status | Details |
 |---------|--------|---------|
-| REST API | ✅ 62/62 tests | NestJS + Fastify on port 3005 |
-| JSON-RPC MCP | ✅ 13 tools | Streamable HTTP on port 3006 |
+| REST API | ✅ 75/75 tests | NestJS + Fastify on port 3005 |
+| JSON-RPC MCP | ✅ 15/15 tests · 13 tools | Streamable HTTP on port 3100 (dev) |
 | Bruno collection | ✅ 27 reqs, 58 assertions | TeleCRM wire-compatible |
-| WhatsApp | ✅ wwebjs driver | Pairing-code auth, templates, broadcasts |
-| Telephony | ✅ Dialer + callbacks | OSS provider on Asterisk |
+| WhatsApp | ✅ 14/14 tests · wwebjs driver | Pairing-code auth, templates, broadcasts |
+| Telephony | ✅ 11/11 tests | Dialer + callbacks, OSS provider on Asterisk |
 
 ---
 
@@ -16,8 +16,8 @@
 
 ```bash
 make setup      # provision deps + install + db-init + db-migrate + db-seed
-pnpm dev        # API on :3005, MCP on :3006
-pnpm test       # 62 contract tests, 7 suites
+pnpm dev        # API on :3005, MCP on :3100
+pnpm test       # 75 API + 15 MCP + 14 whatsapp + 11 telephony tests, 13 suites
 ```
 
 Or step by step:
@@ -85,6 +85,7 @@ All requests route through `AuthGuard` + RLS via `withTenant(eid)` — no row ca
 | Custom actions | ✅ |
 | WhatsApp (conversations, send, templates) | ✅ |
 | Telephony (calls, dialer, callbacks, recordings) | ✅ |
+| Automation (rules, schedule, distribution, webhook) | ✅ |
 | Web app, widget, extension, mobile | 🚧 — API first, apps deferred |
 
 Full detail: [docs/PARITY.md](./docs/PARITY.md)
@@ -94,8 +95,8 @@ Full detail: [docs/PARITY.md](./docs/PARITY.md)
 ## Test surface
 
 ```bash
-pnpm test              # all workspace tests
-cd services/api && npx vitest run  # focused: 62 tests, 7 files
+pnpm test              # all workspace tests (75 API + 15 MCP + 14 whatsapp + 11 telephony)
+cd services/api && npx vitest run --config vitest.contract.config.ts  # focused: 75 tests, 9 files
 make typecheck         # tsc --noEmit across all workspaces
 pnpm lint              # Biome
 ```
