@@ -4,11 +4,16 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
+  BellRing,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   MessageSquare,
+  PhoneCall,
   Settings,
   Users,
+  Webhook,
+  Workflow,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -19,6 +24,12 @@ const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
   { href: '/inbox', label: 'Inbox', icon: MessageSquare },
+  { href: '/dialer', label: 'Dialer', icon: PhoneCall },
+  { href: '/automations', label: 'Automations', icon: Workflow },
+  { href: '/templates', label: 'Templates', icon: Megaphone },
+  { href: '/broadcasts', label: 'Broadcasts', icon: BellRing },
+  { href: '/callbacks', label: 'Callbacks', icon: PhoneCall },
+  { href: '/webhooks', label: 'Webhooks', icon: Webhook },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

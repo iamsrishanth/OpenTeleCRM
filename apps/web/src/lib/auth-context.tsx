@@ -12,7 +12,7 @@ import {
 import { setApiCtx } from './api'
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3100/autoupdate/v2'
+  process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3005/autoupdate/v2'
 
 const TOKEN_KEY = 'opentelecrm.token'
 const EID_KEY = 'opentelecrm.enterpriseId'

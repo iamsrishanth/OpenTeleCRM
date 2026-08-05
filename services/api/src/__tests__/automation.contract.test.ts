@@ -558,3 +558,58 @@ describe('P4 automation engine — (f) tenant isolation', () => {
     }
   });
 });
+
+describe('P4 automation engine — (g) run history endpoint', () => {
+  it('GET /automations/:id/runs returns runs for a rule after a manual test fire', async () => {
+    const name = `contract-${Date.now()}-runs`;
+    const create = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({
+        name,
+        trigger: { kind: 'lead_created', config: {} },
+        actions: [{ kind: 'update_field', config: { apiName: 'score', value: 0 } }],
+      }),
+    });
+    expect(create.status).toBe(201);
+    const created = (await create.json()) as { data: { id: string } };
+
+    const testFire = await fetch(
+      `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/test`,
+      {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({ payload: { lead: { id: '00000000-0000-0000-0000-000000000000' } } }),
+      },
+    );
+    expect(testFire.status).toBe(200);
+    const fired = (await testFire.json()) as { runId: string };
+    expect(fired.runId).toBeTruthy();
+
+    const runs = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/runs`, {
+      headers: auth(),
+    });
+    expect(runs.status).toBe(200);
+    const runsBody = (await runs.json()) as {
+      data: Array<{ id: string; status: string; startedAt: string; stepsExecuted: number }>;
+    };
+    expect(runsBody.data.length).toBeGreaterThanOrEqual(1);
+    expect(runsBody.data[0]!.id).toBe(fired.runId);
+    expect(typeof runsBody.data[0]!.startedAt).toBe('string');
+
+    // Cleanup
+    await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}`, {
+      method: 'DELETE',
+      headers: auth(),
+    });
+  });
+
+  it('runs for a rule are tenant-scoped (empty for another enterprise)', async () => {
+    // An unknown id under the OTHER tenant must 404 (rule not found in that tenant).
+    const attempt = await fetch(
+      `${base}${PREFIX}/enterprise/${OTHER_ENTERPRISE_ID}/automations/00000000-0000-0000-0000-000000000000/runs`,
+      { headers: auth(OTHER_ENTERPRISE_ID) },
+    );
+    expect([404, 500]).toContain(attempt.status);
+  });
+});

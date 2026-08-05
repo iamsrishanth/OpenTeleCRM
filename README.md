@@ -86,7 +86,7 @@ All requests route through `AuthGuard` + RLS via `withTenant(eid)` — no row ca
 | WhatsApp (conversations, send, templates) | ✅ |
 | Telephony (calls, dialer, callbacks, recordings) | ✅ |
 | Automation (rules, schedule, distribution, webhook) | ✅ |
-| Web app, widget, extension, mobile | 🚧 — API first, apps deferred |
+| Web app, widget, extension, mobile | 🚧 — web desk shipped (real-stats dashboard, lead action bar, dialer, automations, templates, broadcasts, callbacks, webhooks); widget/extension/mobile empty |
 
 Full detail: [docs/PARITY.md](./docs/PARITY.md)
 

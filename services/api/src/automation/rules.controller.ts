@@ -86,6 +86,20 @@ export class RulesController {
     return { data: rule };
   }
 
+  @Get(':id/runs')
+  async runs(@Param('eid') eid: string, @Param('id') id: string, @Req() req: FastifyRequest) {
+    assertTenant(req, eid);
+    const rule = await this.service.getRule(eid, id);
+    if (!rule) {
+      throw new HttpException(
+        { error: { code: 'AUTOMATION_NOT_FOUND', message: 'Rule not found' } },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const runs = await this.service.listRuns(eid, id);
+    return { data: runs };
+  }
+
   @Patch(':id')
   async update(
     @Param('eid') eid: string,

@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowRight,
+  CalendarClock,
   MessageSquare,
   PhoneCall,
   Plus,
+  RefreshCw,
   Users,
 } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
@@ -23,29 +25,7 @@ import {
 } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { asList, type Lead } from '@/lib/types'
-
-// Hardcoded for now — wired to mock data until analytics endpoints land.
-const MOCK_STATS = [
-  {
-    label: 'Total Leads',
-    value: 128,
-    icon: Users,
-    accent: 'text-primary',
-  },
-  {
-    label: 'Active Conversations',
-    value: 24,
-    icon: MessageSquare,
-    accent: 'text-cyan-400',
-  },
-  {
-    label: 'Calls Today',
-    value: 42,
-    icon: PhoneCall,
-    accent: 'text-amber-400',
-  },
-]
+import { asList, type DashboardStats, type Lead } from '@/lib/types'
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
@@ -58,7 +38,21 @@ function formatDate(iso: string | null): string {
 export default function DashboardPage() {
   const { isReady, token, enterpriseId } = useAuth()
   const router = useRouter()
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [statsError, setStatsError] = useState(false)
   const [recent, setRecent] = useState<Lead[] | null>(null)
+
+  const loadStats = useCallback(async () => {
+    if (!token || !enterpriseId) return
+    try {
+      const res = await api.get<{ data: DashboardStats }>('/dashboard/stats')
+      setStats(res.data)
+      setStatsError(false)
+    } catch {
+      setStats(null)
+      setStatsError(true)
+    }
+  }, [token, enterpriseId])
 
   useEffect(() => {
     if (!isReady) return
@@ -67,6 +61,7 @@ export default function DashboardPage() {
       return
     }
     let cancelled = false
+    loadStats()
     api
       .get<unknown>('/leads?limit=5')
       .then((data) => {
@@ -78,7 +73,36 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [isReady, token, enterpriseId, router])
+  }, [isReady, token, enterpriseId, router, loadStats])
+
+  const statCards = stats
+    ? [
+        {
+          label: 'Total Leads',
+          value: stats.leadsTotal,
+          icon: Users,
+          accent: 'text-primary',
+        },
+        {
+          label: 'Open Conversations',
+          value: stats.openConversations,
+          icon: MessageSquare,
+          accent: 'text-cyan-400',
+        },
+        {
+          label: 'Calls Today',
+          value: stats.callsToday,
+          icon: PhoneCall,
+          accent: 'text-amber-400',
+        },
+        {
+          label: 'Callbacks Due',
+          value: stats.callbacksDue,
+          icon: CalendarClock,
+          accent: 'text-rose-400',
+        },
+      ]
+    : []
 
   if (!isReady || !token) return <LoadingScreen label="Checking session…" />
 
@@ -96,32 +120,45 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {MOCK_STATS.map(({ label, value, icon: Icon, accent }) => (
-            <Card key={label}>
-              <CardContent className="flex items-center gap-4 pt-6">
-                <div
-                  className={`flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted ${accent}`}
-                >
-                  <Icon className="size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <p className="text-2xl font-semibold tabular-nums">
-                    {value}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {statsError ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Couldn&apos;t load dashboard stats.
+            </p>
+            <Button variant="outline" size="sm" onClick={loadStats}>
+              <RefreshCw className="size-3.5" /> Retry
+            </Button>
+          </div>
+        ) : stats === null ? (
+          <LoadingScreen label="Loading stats…" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {statCards.map(({ label, value, icon: Icon, accent }) => (
+              <Card key={label}>
+                <CardContent className="flex items-center gap-4 pt-6">
+                  <div
+                    className={`flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted ${accent}`}
+                  >
+                    <Icon className="size-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="text-2xl font-semibold tabular-nums">
+                      {value}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-        {/* Recent leads */}
+        {/* Recent activity */}
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle>Recent Leads</CardTitle>
-              <CardDescription>Latest 5 leads in the pipeline</CardDescription>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Latest leads in the pipeline</CardDescription>
             </div>
             <Button variant="ghost" size="sm" render={<Link href="/leads" />}>
               View all <ArrowRight className="ml-1 size-3.5" />

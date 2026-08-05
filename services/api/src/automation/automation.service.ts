@@ -174,6 +174,34 @@ export class AutomationService implements OnModuleInit {
     return rows.map(rowToRule);
   }
 
+  /** Recent run history for one rule (newest first) — powers the run log UI. */
+  async listRuns(eid: string, ruleId: string, limit = 50): Promise<AutomationRun[]> {
+    const rows = await this.withTenant(eid, async (db) =>
+      db
+        .select()
+        .from(automationRun)
+        .where(and(eq(automationRun.enterpriseId, eid), eq(automationRun.automationId, ruleId)))
+        .orderBy(desc(automationRun.startedAt))
+        .limit(limit),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      enterpriseId: row.enterpriseId,
+      automationId: row.automationId,
+      leadId: row.leadId,
+      status: row.status as AutomationRunStatus,
+      correlationId: row.correlationId,
+      triggerPayload: row.triggerPayload,
+      resolvedContext: row.resolvedContext,
+      stepsExecuted: row.stepsExecuted,
+      conditionsMatched: row.conditionsMatched,
+      error: row.error,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
+      durationMs: row.durationMs,
+    }));
+  }
+
   async getRule(eid: string, id: string): Promise<AutomationRule | null> {
     const rows = await this.withTenant(eid, async (db) =>
       db

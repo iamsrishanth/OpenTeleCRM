@@ -14,6 +14,9 @@ async function bootstrap() {
     exclude: ['/health'],
   });
 
+  // First-class web client (apps/web) on a different origin in dev.
+  app.enableCors({ origin: true, credentials: true });
+
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });
   console.log(`OpenTeleCRM API listening on http://0.0.0.0:${port} (prefix ${process.env.API_BASE_PATH ?? '/autoupdate/v2'})`);
