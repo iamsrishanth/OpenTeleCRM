@@ -1,16 +1,19 @@
 /**
- * Asterisk ARI telephony provider — SCAFFOLD.
+ * Asterisk ARI telephony provider — LIVE wiring (A1.1).
  *
- * Live ARI wiring is a later phase. This class implements the TelephonyProvider
- * contract and will talk to Asterisk's REST API (ari/channels, ari/recordings)
- * once TELEPHONY_ARI_URL is set. Until then every method throws, so a
- * mis-configured deployment fails loudly at dial time instead of silently
- * no-op'ing.
+ * Talks to Asterisk's REST API (ari/channels, ari/recordings) and subscribes
+ * to the Stasis application over the ARI WebSocket events endpoint, mapping
+ * StasisStart / ChannelStateChange / ChannelDestroyed into CRM call events.
  *
- * Transport is global fetch only (no new deps). Auth is HTTP Basic
- * (ari_user/ari_password from ARI config). callState polling is expected to be
- * replaced by ARI WebSocket events in the live phase; on() is a placeholder.
+ * Transport is global fetch + global WebSocket only (no new deps). Auth is
+ * HTTP Basic (ari_user/ari_password from ARI config); the WebSocket passes
+ * the same creds via the documented `api_key` query parameter.
+ *
+ * Origination: POST /ari/channels with endpoint PJSIP/<trunk> + context
+ * <TELEPHONY_ARI_CONTEXT, default from-crm>. The dialplan hands the channel
+ * to Stasis/opentelecrm (extensions.conf) and events flow back here.
  */
+import { EventEmitter } from 'node:events'
 import type { CallStatus, TelephonyProvider } from '@opentelecrm/contracts'
 
 export interface AsteriskAriOptions {
@@ -20,6 +23,23 @@ export interface AsteriskAriOptions {
   ariPassword?: string | null
   /** Origination endpoint, e.g. PJSIP/<trunk>. */
   trunk?: string | null
+  /** Dialplan context the originated channel lands in. */
+  context?: string | null
+  /** Stasis application name the events WebSocket subscribes to. */
+  app?: string | null
+}
+
+/** A normalized call lifecycle event emitted by on('call'). */
+export interface AriCallEvent {
+  type: 'ringing' | 'answered' | 'ended'
+  /** ARI channel id — maps to call.provider_call_id. */
+  callId: string
+  /** Channel variable set at originate (enterprise_id). */
+  enterpriseId?: string
+  /** Channel variable set at originate (lead_id). */
+  leadId?: string | null
+  /** For 'ended': elapsed seconds since channel creation. */
+  durationSec?: number
 }
 
 const NOT_CONFIGURED = 'asterisk-ari not configured — set TELEPHONY_ARI_* env'
@@ -31,12 +51,23 @@ export class AsteriskAriProvider implements TelephonyProvider {
   private readonly ariUser: string
   private readonly ariPassword: string
   private readonly trunk: string
+  private readonly context: string
+  private readonly app: string
+
+  private events = new EventEmitter()
+  private ws: WebSocket | null = null
 
   constructor(options: AsteriskAriOptions = {}) {
-    this.ariUrl = options.ariUrl ?? process.env.TELEPHONY_ARI_URL ?? null
+    // Normalize to the Asterisk BASE (strip a trailing /ari) so every call
+    // site appends /ari/... consistently — dial hits /ari/channels, the
+    // events websocket hits /ari/events. Accepts both
+    // TELEPHONY_ARI_URL=http://host:8088 and http://host:8088/ari.
+    this.ariUrl = (options.ariUrl ?? process.env.TELEPHONY_ARI_URL ?? null)?.replace(/\/ari\/?$/, '') ?? null
     this.ariUser = options.ariUser ?? process.env.TELEPHONY_ARI_USER ?? ''
     this.ariPassword = options.ariPassword ?? process.env.TELEPHONY_ARI_PASSWORD ?? ''
-    this.trunk = options.trunk ?? process.env.TELEPHONY_ARI_TRUNK ?? 'PJSIP/default'
+    this.trunk = options.trunk ?? process.env.TELEPHONY_ARI_TRUNK ?? 'PJSIP/from-crm'
+    this.context = options.context ?? process.env.TELEPHONY_ARI_CONTEXT ?? 'from-crm'
+    this.app = options.app ?? process.env.TELEPHONY_ARI_APP ?? 'opentelecrm'
   }
 
   private assertConfigured(): void {
@@ -48,6 +79,90 @@ export class AsteriskAriProvider implements TelephonyProvider {
     return {
       Authorization: `Basic ${basic}`,
       'Content-Type': 'application/json',
+    }
+  }
+
+  /**
+   * Open the ARI events WebSocket for the Stasis app (idempotent).
+   * The channel variables set at originate (enterprise_id / lead_id) are
+   * echoed back on every event so the API can tenant-scope the update.
+   */
+  async startEvents(): Promise<void> {
+    if (this.ws) return
+    if (!this.ariUrl) return // not configured → no-op (mock-compatible)
+    const wsBase = this.ariUrl.replace(/^http/, 'ws')
+    const wsUrl =
+      `${wsBase}/ari/events?app=${encodeURIComponent(this.app)}` +
+      `&api_key=${encodeURIComponent(`${this.ariUser}:${this.ariPassword}`)}`
+
+    let WS = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket
+    if (!WS) {
+      // Node 20 (system node on Debian 13) has no global WebSocket (21+).
+      // Fall back to undici's WebSocket so the operator env works on either.
+      try {
+        const undici = await import('undici')
+        WS = undici.WebSocket as typeof WebSocket
+      } catch {
+        WS = undefined
+      }
+    }
+    if (!WS) {
+      throw new Error(
+        'no WebSocket available — run on Node 22+ or add undici to the deploy env',
+      )
+    }
+
+    this.ws = new WS(wsUrl)
+    this.ws.onmessage = (ev) => this.handleEvent(String(ev.data))
+    this.ws.onclose = () => {
+      this.ws = null
+      // Reconnect on a delay — the bridge re-subscribes on the next call.
+      setTimeout(() => {
+        this.startEvents().catch(() => {})
+      }, 5_000)
+    }
+    this.ws.onerror = (err) => {
+      console.warn(
+        '[asterisk-ari] events websocket error:',
+        (err as { message?: string } | undefined)?.message ?? 'unknown',
+      )
+    }
+  }
+
+  private handleEvent(raw: string): void {
+    let msg: {
+      type?: string
+      channel?: { id?: string; state?: string; creationtime?: string; variables?: Record<string, unknown> }
+    }
+    try {
+      msg = JSON.parse(raw) as typeof msg
+    } catch {
+      return
+    }
+    const channel = msg.channel
+    if (!msg.type || !channel?.id) return
+
+    const callId = channel.id
+    const vars = channel.variables ?? {}
+    const enterpriseId = typeof vars.enterprise_id === 'string' ? vars.enterprise_id : undefined
+    const leadId = typeof vars.lead_id === 'string' ? vars.lead_id : null
+
+    switch (msg.type) {
+      case 'StasisStart':
+        this.events.emit('call', { type: 'ringing', callId, enterpriseId, leadId })
+        break
+      case 'ChannelStateChange':
+        if (channel.state === 'Up') {
+          this.events.emit('call', { type: 'answered', callId, enterpriseId, leadId })
+        }
+        break
+      case 'ChannelDestroyed': {
+        const durationSec = channel.creationtime
+          ? Math.max(0, Math.round((Date.now() - Date.parse(channel.creationtime)) / 1000))
+          : 0
+        this.events.emit('call', { type: 'ended', callId, enterpriseId, leadId, durationSec })
+        break
+      }
     }
   }
 
@@ -63,7 +178,7 @@ export class AsteriskAriProvider implements TelephonyProvider {
       body: JSON.stringify({
         endpoint: this.trunk,
         callerId: from ? `"OpenTeleCRM" <${from}>` : undefined,
-        context: 'from-internal',
+        context: this.context,
         extension: to,
         ...(context ?? {}),
       }),
@@ -130,9 +245,9 @@ export class AsteriskAriProvider implements TelephonyProvider {
     return { recordingId: `rec-${callId}` }
   }
 
-  on(_event: 'call' | 'status', _cb: (arg: unknown) => void): () => void {
-    // ARI WebSocket event wiring lands with the live phase.
-    return () => {}
+  on(event: 'call' | 'status', cb: (arg: unknown) => void): () => void {
+    this.events.on(event, cb)
+    return () => this.events.off(event, cb)
   }
 }
 

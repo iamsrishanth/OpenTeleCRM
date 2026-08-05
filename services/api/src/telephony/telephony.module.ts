@@ -4,6 +4,7 @@ import { CallerIdController } from './caller-id.controller.js';
 import { DialerController } from './dialer.controller.js';
 import { CallbacksController } from './callbacks.controller.js';
 import { RecordingsController } from './recordings.controller.js';
+import { CallEventBridge } from './call-events.bridge.js';
 
 /**
  * Telephony API surface (P3) — call logging/tracking (A1.3), live caller ID
@@ -24,6 +25,6 @@ import { RecordingsController } from './recordings.controller.js';
 @Module({
   imports: [],
   controllers: [CallsController, CallerIdController, DialerController, CallbacksController, RecordingsController],
-  providers: [],
+  providers: [CallEventBridge],
 })
 export class TelephonyModule {}

@@ -37,10 +37,17 @@ echo "==> OpenTeleCRM Asterisk provisioner"
 echo "    ARI user: ${ARI_USER}   ARI bind: ${ARI_BIND}"
 
 # --- 1. Install Asterisk if missing (native apt, Debian/Ubuntu) -----------
-if ! command -v asterisk >/dev/null 2>&1; then
+# NB: Debian 13 (trixie) has NO asterisk binary package — only sound files.
+# On trixie, build from source first:
+#   bash infra/asterisk/provision/build-asterisk-source.sh
+# then re-run this script (the check below skips the apt install).
+if ! command -v asterisk >/dev/null 2>&1 && [ ! -x /usr/sbin/asterisk ]; then
   echo "==> Installing asterisk + core sounds (apt)..."
-  sudo apt-get update -qq
-  sudo apt-get install -y asterisk asterisk-core-sounds-en
+  sudo apt-get install -y asterisk asterisk-core-sounds-en || {
+    echo "!! apt has no asterisk package on this distro (Debian 13+)." >&2
+    echo "   Build from source first: bash infra/asterisk/provision/build-asterisk-source.sh" >&2
+    exit 1
+  }
 fi
 # NOTE: there is no separate 'asterisk-ari' package — ARI ships as res_ari_*
 # modules inside the 'asterisk' package; step 4 ensures they are loaded.
@@ -93,8 +100,13 @@ fi
 
 # Explicit loads for the ARI + Stasis + PJSIP module set. Redundant when the
 # distro modules.conf has autoload=yes, but documents the requirement and
-# covers hosts where autoload was turned off.
-for mod in res_ari res_ari_channels res_ari_endpoints res_stasis res_pjsip chan_pjsip; do
+# covers hosts where autoload was turned off (source builds ship autoload=no).
+# ORDER MATTERS: res_ari needs res_websocket_client + res_ari_model first;
+# res_ari_channels needs the res_stasis_* helpers.
+for mod in res_http_websocket res_websocket_client res_ari_model res_ari \
+  res_stasis res_stasis_answer res_stasis_playback res_stasis_recording \
+  res_stasis_snoop res_ari_channels res_ari_endpoints res_ari_playbacks \
+  res_ari_recordings res_ari_asterisk res_pjsip chan_pjsip; do
   ensure_line "$ASTERISK_ETC/modules.conf" "load => ${mod}.so"
 done
 

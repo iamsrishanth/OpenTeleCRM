@@ -1,0 +1,20 @@
+[Unit]
+Description=Asterisk PBX (source-built — Debian 13 ships no asterisk binary)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# The 'asterisk' user/group are created by infra/asterisk/provision/asterisk.sh
+# (source-build path) — never run Asterisk as root.
+User=asterisk
+Group=asterisk
+# -f: foreground (systemd supervises). -U/-G: drop privileges.
+ExecStart=/usr/sbin/asterisk -f -U asterisk -G asterisk
+ExecReload=/usr/sbin/asterisk -rx "core reload"
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

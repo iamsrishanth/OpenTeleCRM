@@ -18,7 +18,19 @@
  * Meta-approved templates; the cloud-api driver is responsible for those.
  */
 import { EventEmitter } from 'node:events';
-import { Client, LocalAuth, MessageTypes, type Message } from 'whatsapp-web.js';
+// ESM interop: whatsapp-web.js is CJS and Node's cjs-module-lexer does NOT
+// reliably detect its named exports — `import { LocalAuth } ...` crashes with
+// "does not provide an export named 'LocalAuth'", and a namespace import
+// yields undefined members at runtime ("LocalAuth is not a constructor").
+// Load the real CJS module via createRequire; the type position still uses
+// the package's own declarations. Same rule as Baileys' `proto`.
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const WWebJS = require('whatsapp-web.js') as typeof import('whatsapp-web.js');
+const { Client, LocalAuth, MessageTypes } = WWebJS;
+// Type-only namespace for TYPE positions (the runtime `WWebJS` const above
+// can't be used as a namespace in type position).
+import type * as WWebJs from 'whatsapp-web.js';
 import type {
   WhatsAppContact,
   WhatsAppContactId,
@@ -55,7 +67,7 @@ function isGroup(jid: string): boolean {
 }
 
 /** Map whatsapp-web.js MessageTypes to the contract's WhatsAppMessageType. */
-function toContractType(type: MessageTypes): WhatsAppMessageType {
+function toContractType(type: WWebJs.MessageTypes): WhatsAppMessageType {
   switch (type) {
     case MessageTypes.TEXT:
       return 'text';
@@ -85,7 +97,7 @@ function toContractType(type: MessageTypes): WhatsAppMessageType {
 /** One live whatsapp-web.js session, scoped to an agentSessionId. */
 interface WWebJsSessionRecord {
   agentSessionId: string;
-  client: Client;
+  client: WWebJs.Client;
   status: Status;
   qr: string | null;
   screenName: string | null;
@@ -163,10 +175,9 @@ export class WWebJsWhatsAppProvider implements WhatsAppProvider {
     const session = this.require(agentSessionId);
     const chatId = toWWebJsJid(to);
 
-    let message: Message;
+    let message: WWebJs.Message;
     if (options?.buttons?.length) {
-      const { Buttons } = await import('whatsapp-web.js');
-      const btn = new Buttons(
+      const btn = new WWebJS.Buttons(
         text,
         options.buttons.map((b) => ({ id: b.id, body: b.title })),
         undefined,
@@ -249,6 +260,42 @@ export class WWebJsWhatsAppProvider implements WhatsAppProvider {
     phoneNumber: string,
   ): Promise<string> {
     const session = this.require(agentSessionId);
+    // Race 1: wwebjs's requestPairingCode touches `client.pupPage` immediately,
+    // but the page is only created after initialize() boots the browser and
+    // loads web.whatsapp.com. NB: the field is initialized to `null` (not
+    // undefined) — check both.
+    const start = Date.now();
+    while (
+      (session.client as unknown as { pupPage?: unknown }).pupPage == null &&
+      Date.now() - start < 30_000
+    ) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    const page = (session.client as unknown as { pupPage?: { evaluate: (fn: () => unknown) => Promise<unknown> } })
+      .pupPage;
+    if (page == null) {
+      throw new Error('wwebjs page did not initialize within 30s — cannot request pairing code');
+    }
+    // Race 2: requestPairingCode's in-page loop reads
+    // `window.AuthStore.PairingCodeLinkUtils` and CRASHES (not spins) when
+    // `window.AuthStore` is still undefined. Wait for the app store to boot.
+    let authStoreReady = false;
+    for (let i = 0; i < 120 && !authStoreReady; i++) {
+      try {
+        authStoreReady = Boolean(
+          await page.evaluate(() => {
+            const g = globalThis as { AuthStore?: unknown };
+            return typeof g.AuthStore !== 'undefined';
+          }),
+        );
+      } catch {
+        // page may still be mid-navigation — keep polling
+      }
+      if (!authStoreReady) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!authStoreReady) {
+      throw new Error('wwebjs AuthStore did not boot within 30s — cannot request pairing code');
+    }
     const code = await session.client.requestPairingCode(phoneNumber);
     return code;
   }
@@ -318,14 +365,14 @@ export class WWebJsWhatsAppProvider implements WhatsAppProvider {
       }
     });
 
-    client.on('message', (msg: Message) => {
+    client.on('message', (msg: WWebJs.Message) => {
       const normalized = this.toWhatsAppMessage(msg);
       if (normalized) this.events.emit('message', normalized);
     });
   }
 
   /** Translate a whatsapp-web.js Message into the contract shape. */
-  private toWhatsAppMessage(msg: Message): WhatsAppMessage | null {
+  private toWhatsAppMessage(msg: WWebJs.Message): WhatsAppMessage | null {
     const chatId = msg.from;
     if (!chatId) return null;
     if (chatId === 'status@broadcast') return null; // skip status stories

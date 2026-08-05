@@ -37,11 +37,35 @@ P4 lands the A4 automation slice: a pure-TS rule engine, rules CRUD + test runne
 7. Temporal durability decision (ADR-0007) — keep in-process scheduler for v1
 ```
 
+## P4b wave — A4.7 quota metering + live Asterisk/WhatsApp wiring (2026-08-05)
+```
+1. [x] A4.7 automation quota metering (D4 fix): automation_quota table (migration 0005),
+      AutomationMeter sliding-window runs/min limiter, 'throttled' run rows,
+      GET /automations/usage + GET|PUT /automations/quota — 93/93 contract tests
+2. [x] WhatsApp live driver: Baileys restored (pairing-code, native) + env-wired
+      WHATSAPP_DRIVER=mock|wwebjs|baileys / WHATSAPP_SESSION_ID=cli; wwebjs
+      ESM interop fixed (createRequire); wwebjs pairing-code path is broken vs
+      current WA Web — Baileys is the operator driver. Pairing remains the
+      operator step: pnpm --filter @opentelecrm/whatsapp pair -- --code <phone>
+3. [x] Asterisk live wiring (native, no Docker — Debian 13 has no asterisk pkg):
+      source build script (infra/asterisk/provision/build-asterisk-source.sh,
+      Asterisk 21 LTS), systemd unit, ARI modules + events websocket, Stasis()
+      dialplan (Asterisk 20+ has no Dial(Stasis/) channel tech)
+4. [x] API live dial: POST /dialer/:leadId/dial → ARI originate (channel vars
+      enterprise_id/lead_id) + call row with provider_call_id (migration 0006);
+      CallEventBridge maps StasisStart/ChannelStateChange/ChannelDestroyed →
+      call row updates. Smoke-verified end-to-end (Local harness); real SIP
+      trunk is operator config (TELEPHONY_ARI_TRUNK)
+5. [ ] Temporal durability decision (ADR-0007) — deferred by user directive
+      (A4.7 + wiring took priority this wave)
+```
+
 ## Verification gate
-- [x] Contract tests 75/75 green (`pnpm --filter @opentelecrm/api test`)
-- [x] Automation surface pinned by `automation.contract.test.ts` (CRUD, event fire, stage change, schedule, distribution, webhook, tenant isolation)
-- [x] MCP 15/15, telephony 11/11, whatsapp 14/14 green; root `pnpm test` exits 0
-- [ ] PARITY.md A4 rows reflect final state (A4.1/A4.6/A4.7 flip when visual builder + templates + quota metering land in P4b)
+- [x] Contract tests 95/95 green (`pnpm --filter @opentelecrm/api test`)
+- [x] Automation surface pinned by `automation.contract.test.ts` + `automation.quota.contract.test.ts` (CRUD, event fire, stage change, schedule, distribution, webhook, quota, tenant isolation)
+- [x] Telephony surface pinned by `telephony.contract.test.ts` (dial + call-event bridge suites)
+- [x] MCP 15/15, telephony 13/13, whatsapp 14/14 green; root `pnpm test` exits 0
+- [x] PARITY.md A4 rows reflect final state (A4.7 ✅, D4 implemented; A1.1 ✅ live dial)
 
 ## Rollback
 Per-vertical-slice: pg_dump pre-migration backup; additive-only migrations (0003 is additive); automation routes sit behind the normal tenant-scoped guard — disable by not importing `AutomationModule` in `app.module.ts`; `git checkout` previous commit to revert code. No destructive migration merges.

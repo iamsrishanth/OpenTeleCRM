@@ -4,7 +4,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import type { DbClient } from '@opentelecrm/db';
 import { conversation, lead, waMessage, waSession } from '@opentelecrm/db';
-import { InboxService, providerFor } from '@opentelecrm/whatsapp';
+import { InboxService, providerFor, resolveWhatsappDriver, resolveAgentSessionId } from '@opentelecrm/whatsapp';
 import type { WhatsAppMessage } from '@opentelecrm/contracts';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
@@ -110,8 +110,11 @@ export class InboxController {
       });
     }
 
-    const agentSessionId = `${eid}:mock`;
-    const provider = await providerFor(agentSessionId, 'mock');
+    // Driver comes from env (WHATSAPP_DRIVER) so the operator env can run
+    // the real wwebjs session while contract tests stay on the mock.
+    const driver = resolveWhatsappDriver();
+    const agentSessionId = resolveAgentSessionId(eid, driver);
+    const provider = await providerFor(agentSessionId, driver);
     // Mock driver starts 'connecting'; sendText rejects unless 'ready'.
     await provider.connect(agentSessionId);
 

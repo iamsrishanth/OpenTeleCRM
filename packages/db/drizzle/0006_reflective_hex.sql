@@ -1,0 +1,1 @@
+ALTER TABLE "call" ADD COLUMN "provider_call_id" varchar(128);

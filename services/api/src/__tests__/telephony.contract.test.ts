@@ -15,8 +15,10 @@ import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import jwt from 'jsonwebtoken';
-import { withTenant, recording } from '@opentelecrm/db';
+import { eq } from 'drizzle-orm';
+import { withTenant, call, recording } from '@opentelecrm/db';
 import { AppModule } from '../app.module.js';
+import { CallEventBridge } from '../telephony/call-events.bridge.js';
 
 const ENTERPRISE_ID = process.env.TEST_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
 // Second seeded enterprise — used for the tenant-isolation assertion.
@@ -400,5 +402,128 @@ describe('Tenant isolation (RLS)', () => {
     );
     expect(other.status).toBe(200);
     expect(other.body.data.some((c) => c.id === created.body.id)).toBe(false);
+  });
+});
+
+describe('A1.1 1-click dial — POST /dialer/:leadId/dial (live wiring)', () => {
+  it('dials through the configured provider and creates a queued call row', async () => {
+    // Mock driver is the default in tests (TELEPHONY_DRIVER unset) — dial()
+    // returns a synthetic call id; the call row + provider_call_id wiring is
+    // what this pins (the ARI driver uses the same contract shape).
+    // Create a deterministic lead with a dialable E.164 identifier.
+    const created = await post<{ leadId: string; id: string }>('/lead', {
+      identifier: `+9191${Math.floor(Math.random() * 1_000_000_000)}`,
+      source: 'web',
+    });
+    expect(created.status).toBe(201);
+    const leadId = created.body.leadId ?? created.body.id;
+    expect(leadId).toBeTruthy();
+
+    const { status, body } = await post<{ callId: string; id: string }>(
+      `/dialer/${leadId}/dial`,
+      {},
+    );
+    expect(status).toBe(200);
+    expect(body.callId).toMatch(/^mock-call-\d+$/);
+    expect(body.id).toBeTruthy();
+
+    // The call row exists, queued, with the provider call id mapped.
+    const rows = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx
+        .select()
+        .from(call)
+        .where(eq(call.id, body.id))
+        .limit(1),
+    );
+    expect(rows[0]?.status).toBe('queued');
+    expect(rows[0]?.providerCallId).toBe(body.callId);
+    expect(rows[0]?.direction).toBe('outbound');
+    expect(rows[0]?.phone.startsWith('+9191')).toBe(true);
+  });
+
+  it('returns 404 for an unknown or malformed lead', async () => {
+    const missing = await post<{ error: { code: string } }>(
+      '/dialer/00000000-0000-4000-8000-000000000000/dial',
+      {},
+    );
+    expect(missing.status).toBe(404);
+
+    const malformed = await post<{ error: { code: string } }>('/dialer/x/dial', {});
+    expect(malformed.status).toBe(404);
+  });
+});
+
+describe('A1.1 call-event bridge — ARI Stasis events update call rows', () => {
+  it('maps ringing → answered → ended lifecycle onto provider_call_id rows', async () => {
+    const bridge = app.get(CallEventBridge);
+
+    // Insert a call row as the dial endpoint would (provider_call_id set).
+    const providerCallId = `ari-test-${Date.now()}`;
+    const [row] = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx
+        .insert(call)
+        .values({
+          enterpriseId: ENTERPRISE_ID,
+          direction: 'outbound',
+          status: 'queued',
+          phone: '+919100000099',
+          providerCallId,
+        })
+        .returning({ id: call.id }),
+    );
+    expect(row?.id).toBeTruthy();
+
+    await bridge.applyEvent({
+      type: 'ringing',
+      callId: providerCallId,
+      enterpriseId: ENTERPRISE_ID,
+      leadId: null,
+    });
+    await bridge.applyEvent({
+      type: 'answered',
+      callId: providerCallId,
+      enterpriseId: ENTERPRISE_ID,
+      leadId: null,
+    });
+    await bridge.applyEvent({
+      type: 'ended',
+      callId: providerCallId,
+      enterpriseId: ENTERPRISE_ID,
+      leadId: null,
+      durationSec: 42,
+    });
+
+    const after = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx
+        .select()
+        .from(call)
+        .where(eq(call.id, row!.id))
+        .limit(1),
+    );
+    expect(after[0]?.status).toBe('completed');
+    expect(after[0]?.durationSec).toBe(42);
+    expect(after[0]?.endedAt).toBeTruthy();
+  });
+
+  it('ignores events without tenant context and unknown channel ids', async () => {
+    const bridge = app.get(CallEventBridge);
+    // No enterpriseId → no-op, no throw.
+    await expect(
+      bridge.applyEvent({ type: 'ended', callId: 'x', durationSec: 1 }),
+    ).resolves.toBeUndefined();
+    // Unknown provider_call_id for the tenant → no row touched.
+    const before = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx.select({ c: call.id }).from(call),
+    );
+    await bridge.applyEvent({
+      type: 'ended',
+      callId: `no-such-${Date.now()}`,
+      enterpriseId: ENTERPRISE_ID,
+      durationSec: 1,
+    });
+    const after = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx.select({ c: call.id }).from(call),
+    );
+    expect(after.length).toBe(before.length);
   });
 });

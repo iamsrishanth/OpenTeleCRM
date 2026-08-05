@@ -51,6 +51,8 @@ export const call = pgTable(
     trunk: varchar('trunk', { length: 64 }),
     /** Number the call was placed to / received on. */
     did: varchar('did', { length: 32 }),
+    /** Provider-side call/channel id (ARI channel id) — maps PBX events to this row. */
+    providerCallId: varchar('provider_call_id', { length: 128 }),
     agentUserId: uuid('agent_user_id').references(() => user.id, { onDelete: 'set null' }),
     note: text('note'),
     ...withTimestamps,

@@ -5,7 +5,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import type { DbClient } from '@opentelecrm/db';
 import { consentLedger, lead, waBroadcast, waSession, waTemplate } from '@opentelecrm/db';
-import { providerFor } from '@opentelecrm/whatsapp';
+import { providerFor, resolveWhatsappDriver, resolveAgentSessionId } from '@opentelecrm/whatsapp';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -202,11 +202,13 @@ export class BroadcastsController {
         .returning();
       if (!sending) throw new Error('broadcast start update returned no row');
 
-      // Mock-driver path: send eagerly (no throttle/jitter — that lives in wwebjs).
-      const agentSessionKey = `${eid}:mock`;
-      const provider = await providerFor(agentSessionKey, 'mock');
-      await provider.connect(agentSessionKey);
-      const agentSessionId = broadcast.agentSessionId;
+      // Driver comes from env (WHATSAPP_DRIVER); the send session key must
+      // match the key the provider was connected under (wwebjs enforces it;
+      // the mock tolerates any id).
+      const driver = resolveWhatsappDriver();
+      const sessionKey = resolveAgentSessionId(eid, driver);
+      const provider = await providerFor(sessionKey, driver);
+      await provider.connect(sessionKey);
 
       const messageBody = broadcast.text ?? '';
       let delivered = 0;
@@ -214,7 +216,7 @@ export class BroadcastsController {
       const updatedRecipients: RecipientRow[] = [];
       for (const r of recipients) {
         try {
-          await provider.sendText(agentSessionId, r.jid, messageBody);
+          await provider.sendText(sessionKey, r.jid, messageBody);
           delivered += 1;
           updatedRecipients.push({ ...r, status: 'delivered', sentAt: new Date().toISOString() });
         } catch (err) {

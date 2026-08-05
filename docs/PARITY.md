@@ -28,7 +28,7 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A1.1 | 1-Click Dialer | `services/telephony` (`scoring.ts`, `registry.ts`, providers) + `services/api` (`telephony/dialer.controller.ts`) | Asterisk ARI (scaffold, ADR-0026), mock provider | 🚧 | `dialer/next` returns ranked candidates (score + reasons, TRAI window-filtered, DND-suppressed); disposition logs a call + auto-schedules follow-up callback; `skip` is a no-op v1 (fairness via callsToday penalty). Live Asterisk dialing not wired — needs paired PBX (Stasis-events phase) | `telephony.contract.test.ts` (dialer/next + disposition suites) |
+| A1.1 | 1-Click Dialer | `services/telephony` (`scoring.ts`, `registry.ts`, providers) + `services/api` (`telephony/dialer.controller.ts`, `telephony/call-events.bridge.ts`) | Asterisk ARI (live, native — infra/asterisk), mock provider | ✅ | `dialer/next` returns ranked candidates (score + reasons, TRAI window-filtered, DND-suppressed); **`POST /dialer/:leadId/dial` places a real call through Asterisk ARI** (originate carries enterprise_id/lead_id channel vars) and writes a `call` row with `provider_call_id`; **Stasis events bridge** (WebSocket, StasisStart/ChannelStateChange/ChannelDestroyed) updates call rows ringing → in-progress → completed. A real SIP trunk is operator config (`TELEPHONY_ARI_TRUNK`); the smoke uses a Local-channel harness | `telephony.contract.test.ts` (dial + call-event bridge suites) |
 | A1.2 | Call Recording | `packages/db` (`recording` table) + `services/api` (`telephony/recordings.controller.ts`) | Object storage (Garage, ADR-0028 — deferred) | 🚧 | Recording metadata + short-lived signed-URL endpoint green (`GET /recordings/:id`, 1h expiry, mock sig); actual MixMonitor → storage pipeline deferred to Asterisk wiring phase — no recording POST endpoint in this slice | `telephony.contract.test.ts` (recordings suite) |
 | A1.3 | Call Tracking | `packages/db` (`call` table) + `services/api` (`telephony/calls.controller.ts`) | Drizzle, NestJS | ✅ | Auto-links lead by identifier = phone; writes timeline `call` action; list filters (direction/status/disposition/leadId/from/to) + `total`; RLS-verified cross-tenant isolation | `telephony.contract.test.ts` (calls suites) |
 | A1.4 | Click-to-Call | — (planned: `apps/extension`) | — | ❌ | Browser extension not started | — |
@@ -43,10 +43,10 @@ Column semantics:
 
 | TeleCRM ID | Feature | Our module | OSS deps | Status | Divergence note | Test IDs |
 |---|---|---|---|---|---|---|
-| A2.1 | 1-Click WhatsApp | `services/whatsapp` mock + wwebjs drivers (`sendText`), API `POST /enterprise/{eid}/whatsapp/send` | whatsapp-web.js + Puppeteer, contracts | 🚧 | API + mock driver green; real-number pairing needs CLI (`pnpm --filter @opentelecrm/whatsapp pair`) | `whatsapp-inbox.contract.test.ts` |
-| A2.2 | Chat Sync | `wa_session`/`conversation`/`wa_message` tables, `InboxService` (persist + auto lead-attribution), `GET /whatsapp/conversations` + messages | whatsapp-web.js + Puppeteer, Drizzle | 🚧 | Mock path + persistence verified; live chat sync requires paired wwebjs session | `whatsapp-inbox.contract.test.ts` |
+| A2.1 | 1-Click WhatsApp | `services/whatsapp` mock + **baileys** drivers (`sendText`), API `POST /enterprise/{eid}/whatsapp/send` | Baileys (live, pairing-code), contracts | 🚧 | API + mock driver green; **live driver env-wired** (`WHATSAPP_DRIVER=baileys|wwebjs`, `WHATSAPP_SESSION_ID=cli`); pairing is the operator step: `pnpm --filter @opentelecrm/whatsapp pair -- --code <phone>` (Baileys native pairing code — no QR; wwebjs QR path kept but its pairing-code path is broken vs current WA Web) | `whatsapp-inbox.contract.test.ts` |
+| A2.2 | Chat Sync | `wa_session`/`conversation`/`wa_message` tables, `InboxService` (persist + auto lead-attribution), `GET /whatsapp/conversations` + messages | Baileys (live), Drizzle | 🚧 | Mock path + persistence verified; live chat sync requires the paired Baileys session | `whatsapp-inbox.contract.test.ts` |
 | A2.3 | WhatsApp Cloud API | — (Meta Graph API adapter planned) | — | ❌ | Cloud-api driver is a stub in the provider interface; Meta WABA onboarding deferred | — |
-| A2.4 | Broadcast | `wa_broadcast` + `consent_ledger` tables, `POST /whatsapp/broadcasts` + `:id/start` + opt-out, recipients from leadIds | Drizzle, mock driver | 🚧 | Mock-driver path green (no throttle/jitter — lives in wwebjs driver); real broadcast needs paired session | `whatsapp-template-broadcast.contract.test.ts` |
+| A2.4 | Broadcast | `wa_broadcast` + `consent_ledger` tables, `POST /whatsapp/broadcasts` + `:id/start` + opt-out, recipients from leadIds | Drizzle, Baileys (live) | 🚧 | Mock-driver path green (no throttle/jitter — lives in the driver); real broadcast needs the paired session | `whatsapp-template-broadcast.contract.test.ts` |
 | A2.5 | Chatbot | — | — | ❌ | Flow builder + LLM fallback deferred to P2 follow-up / P4 | — |
 | A2.6 | Notifications | — | — | ❌ | Agent notification surface deferred (notifier service) | — |
 | A2.7 | Website widget | — (`apps/widget` empty placeholder) | — | ❌ | Widget SDK deferred | — |
@@ -160,7 +160,7 @@ TeleCRM parity means compatible surface, not bug-compatible behavior. These are 
 | Area | ✅ | 🚧 | ❌ |
 ||---|---|---|---|
 | F Foundation | 2 | 0 | 0 |
-| A1 Sales & Call | 3 (A1.3, A1.5, A1.6) | 2 (A1.1, A1.2) | 3 (A1.4, A1.7, A1.8) |
+| A1 Sales & Call | 4 (A1.1, A1.3, A1.5, A1.6) | 1 (A1.2) | 3 (A1.4, A1.7, A1.8) |
 | A2 WhatsApp | 3 🚧 (A2.1, A2.2, A2.4) | 0 | 5 |
 | A3 Lead Capture | 1 (A3.2 webhook) | 0 | 1 |
 | A4 Automation | 5 (A4.2, A4.3, A4.4, A4.5, A4.7) | 0 | 2 |

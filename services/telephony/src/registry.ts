@@ -38,3 +38,11 @@ export function allProviders(): Map<string, TelephonyProvider> {
 export function dropProvider(enterpriseId: string): void {
   providers.delete(enterpriseId)
 }
+
+/**
+ * Operator-env wiring: the API picks the live telephony driver from env.
+ *   TELEPHONY_DRIVER=mock|asterisk-ari   (default mock — tests stay hermetic)
+ */
+export function resolveTelephonyDriver(): 'mock' | 'asterisk-ari' {
+  return process.env.TELEPHONY_DRIVER === 'asterisk-ari' ? 'asterisk-ari' : 'mock'
+}

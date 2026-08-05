@@ -5,6 +5,7 @@ import type { FastifyRequest } from 'fastify';
 import type { DbClient } from '@opentelecrm/db';
 import { action, actionType, call, callback, dndRegistry, lead } from '@opentelecrm/db';
 import { scoreDialerCandidate, sortDialerCandidates, type DialerInput, type DialerScoringConfig } from '@opentelecrm/telephony';
+import { resolveTelephonyDriver, telephonyProviderFor } from '@opentelecrm/telephony';
 import type { CallDisposition, DialerCandidate, DialerMode } from '@opentelecrm/contracts';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
@@ -171,6 +172,67 @@ export class DialerController {
     });
 
     return { data };
+  }
+
+  @Post(':leadId/dial')
+  @HttpCode(200)
+  async dial(
+    @Param('eid') eid: string,
+    @Param('leadId') leadId: string,
+    @Req() req: FastifyRequest,
+    @Body() body: { from?: string } | undefined,
+  ) {
+    this.assertTenant(req, eid);
+    // Guard malformed ids before they hit the uuid-typed column (a non-UUID
+    // param would 500 on the DB cast instead of 404).
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId)) {
+      throw new HttpException(
+        { error: { code: 'LEAD_NOT_FOUND', message: 'Lead not found' } },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return this.withTenant(eid, async (db) => {
+      const leadRow = await db
+        .select()
+        .from(lead)
+        .where(and(eq(lead.enterpriseId, eid), eq(lead.id, leadId)))
+        .limit(1);
+      if (!leadRow[0]) {
+        throw new HttpException(
+          { error: { code: 'LEAD_NOT_FOUND', message: 'Lead not found' } },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      const phone = leadRow[0].identifier;
+      if (!phone || !phone.startsWith('+')) {
+        throw this.validationError('lead has no dialable phone identifier');
+      }
+
+      // Real 1-click dial (A1.1): driver comes from env. With asterisk-ari the
+      // originate carries enterprise_id/lead_id as channel variables so the
+      // Stasis events can tenant-scope the call row updates.
+      const driver = resolveTelephonyDriver();
+      const provider = await telephonyProviderFor(eid, driver);
+      const { callId } = await provider.dial(phone, body?.from ?? undefined, {
+        variables: { enterprise_id: eid, lead_id: leadId },
+      });
+
+      const [inserted] = await db
+        .insert(call)
+        .values({
+          enterpriseId: eid,
+          leadId,
+          direction: 'outbound',
+          status: 'queued',
+          phone,
+          providerCallId: callId,
+          durationSec: 0,
+          talkSec: 0,
+        })
+        .returning({ id: call.id });
+      if (!inserted) throw new Error('call insert returned no row');
+      return { callId, id: inserted.id };
+    });
   }
 
   @Post(':leadId/disposition')
