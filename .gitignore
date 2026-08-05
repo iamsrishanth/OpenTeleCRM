@@ -41,3 +41,6 @@ infra/docker/volumes/
 # --- Build artifacts (tracked by accident) ---
 *.tsbuildinfo
 *.js.map
+# graphify tool debris
+.graphify_*
+graphify-out/
