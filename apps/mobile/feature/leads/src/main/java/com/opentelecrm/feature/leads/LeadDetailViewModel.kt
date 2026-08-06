@@ -160,7 +160,12 @@ class LeadDetailViewModel @Inject constructor(
     private suspend fun resolveOwnerName(lead: LeadSummary): String? {
         val ownerId = lead.ownerUserId ?: return null
         if (teamCache == null) {
-            teamCache = repository.teamMembers()
+            // Never let the team fetch break the cache-first path (offline).
+            teamCache = try {
+                repository.teamMembers()
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
         return teamCache?.firstOrNull { it.id == ownerId }?.name
     }

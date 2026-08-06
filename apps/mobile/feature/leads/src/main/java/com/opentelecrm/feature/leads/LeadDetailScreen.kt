@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -109,15 +110,8 @@ private fun LeadDetailScreen(
                 .padding(innerPadding),
         ) {
             when {
-                uiState.loading -> {
+                uiState.loading && uiState.lead == null -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                uiState.error != null -> {
-                    ErrorContent(
-                        error = uiState.error,
-                        onRetry = onRetry,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
                 }
                 uiState.lead != null -> {
                     LeadContent(
@@ -128,9 +122,19 @@ private fun LeadDetailScreen(
                         actionError = uiState.actionError,
                         composing = uiState.composing,
                         pendingCount = uiState.pendingCount,
+                        offlineRefreshError = uiState.error,
+                        onRetry = onRetry,
                         onAddNote = onAddNote,
                         onLogCall = onLogCall,
                         onLogWhatsApp = onLogWhatsApp,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                uiState.error != null -> {
+                    ErrorContent(
+                        error = uiState.error,
+                        onRetry = onRetry,
+                        modifier = Modifier.align(Alignment.Center),
                     )
                 }
                 else -> {
@@ -153,6 +157,9 @@ private fun LeadContent(
     actionError: String?,
     composing: Boolean,
     pendingCount: Int,
+    offlineRefreshError: String? = null,
+    onRetry: () -> Unit = {},
+    onRetryTimeline: () -> Unit = {},
     onAddNote: (String) -> Unit,
     onLogCall: () -> Unit,
     onLogWhatsApp: () -> Unit,
@@ -165,6 +172,15 @@ private fun LeadContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        offlineRefreshError?.let { err ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StatusBanner(message = err, isError = true, modifier = Modifier.weight(1f))
+                TextButton(onClick = onRetry) { Text("Retry") }
+            }
+        }
         HeaderCard(lead)
         SectionCard(title = "Details") {
             lead.customFields.entries

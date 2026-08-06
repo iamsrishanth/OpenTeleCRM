@@ -114,7 +114,15 @@ class LeadsListViewModel @Inject constructor(
      * WorkManager worker also flushes automatically on reconnect.
      */
     fun retrySync() {
-        refresh()
+        viewModelScope.launch {
+            // Flush the offline outbox first, then refresh the leads cache.
+            try {
+                actionsRepository.flushQueued()
+            } catch (e: Exception) {
+                // Flush failures are non-fatal — the leads refresh below still runs.
+            }
+            refresh()
+        }
     }
 
     /** Team members for the filter chips (suspend — screen loads them on first composition). */
