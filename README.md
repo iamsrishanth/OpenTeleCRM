@@ -55,14 +55,18 @@ tunnel hostname is set at runtime and never committed.
 
 **Setup (one-time, host-side):**
 
-1. Create a gitignored `.tunnel-host` file containing the tunnel origin, e.g.
-   `https://crm.example.com` (no path — `/autoupdate/v2` is appended by the
-   web app). This file is never committed.
-2. Point the Cloudflare tunnel at the local API (`http://127.0.0.1:3005`) for
-   your hostname — e.g. a named-tunnel ingress rule or a dashboard public
-   hostname, exactly like any other service on this machine.
-3. Run `make tunnel`, restart the web dev server, and the web app's API calls
-   flow through the tunnel.
+1. Add the Cloudflare values to your local `.env` (gitignored — never committed):
+   - `TUNNEL_BASE_URL` — the tunnel origin, e.g. `https://crm.example.com` (no path)
+   - `CLOUDFLARE_API_TOKEN` — API token with `DNS:Edit` + `Cloudflare Tunnel:Write` scope
+   - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_TUNNEL_ID`, `CLOUDFLARE_ZONE_ID` — from your Zero Trust dashboard (zone ID is auto-detected if left blank)
+   - `CLOUDFLARE_TUNNEL_TOKEN` — optional; when set, `make tunnel` installs the cloudflared systemd connector with it
+2. Run `make tunnel`. It calls the Cloudflare API with your token to ensure the DNS
+   CNAME + tunnel ingress rule exist for your hostname (pointing at
+   `http://127.0.0.1:3005`), then flips the web app into tunnel mode.
+3. Restart the web dev server.
+
+Both the token and the domain come from `.env` — the tunnel never ships with
+code files, and `scripts/tunnel.py` contains no hostname, token, or account ID.
 
 **Security notes (read before enabling):**
 
@@ -71,7 +75,7 @@ tunnel hostname is set at runtime and never committed.
   mock drivers, rate limits) is exposed — never run the tunnel with production
   credentials.
 - The tunnel origin and any Cloudflare credentials live ONLY in gitignored
-  files (`.tunnel-host`, `.env`, `.env.local`, `/etc/cloudflared/token`). They
+  files (`.env`, `.env.local`, `/etc/cloudflared/token`). They
   must never be committed, and this README intentionally shows a placeholder
   hostname. `make tunnel` never prints or stores a token.
 - When tunnel mode is on, `NEXT_PUBLIC_*` values are baked into the Next.js
