@@ -27,8 +27,12 @@ fun AppNavHost() {
         navController = navController,
         startDestination = Routes.ONBOARDING,
     ) {
-        composable(Routes.ONBOARDING) { OnboardingRoute() }
-        composable(Routes.LOGIN) { LoginRoute() }
+        composable(Routes.ONBOARDING) {
+            OnboardingRoute(onSaved = { navController.navigate(Routes.LOGIN) })
+        }
+        composable(Routes.LOGIN) {
+            LoginRoute(onLoggedIn = { navController.navigate(Routes.HOME) })
+        }
         composable(Routes.HOME) {
             HomeScreen(onNavigateToSettings = { navController.navigate(Routes.SETTINGS) })
         }

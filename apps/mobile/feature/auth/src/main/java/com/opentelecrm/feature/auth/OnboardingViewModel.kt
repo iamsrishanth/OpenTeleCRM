@@ -51,15 +51,22 @@ class OnboardingViewModel @Inject constructor(
 
     /** Validates the URL and probes the server health endpoint, measuring latency. */
     suspend fun testConnection() {
-        val url = _serverUrl.value.trim()
-        if (!isValidUrl(url)) {
-            _testResult.value = ServerTestResult.Failure("Enter a valid server URL (https://your-server/autoupdate/v2)")
+        val raw = _serverUrl.value.trim()
+        val normalized = try {
+            ServerUrlStore.normalize(raw)
+        } catch (e: IllegalArgumentException) {
+            _testResult.value = ServerTestResult.Failure(e.message ?: "Enter a valid server URL")
             return
         }
+        _serverUrl.value = normalized
         _testing.value = true
         _testResult.value = ServerTestResult.Testing
         val start = System.currentTimeMillis()
         try {
+            // Persist the typed URL first so the ServerUrlInterceptor targets it.
+            // (Test = save for M0: Continue then just navigates; Settings keeps
+            // revert-to-last-good for correcting a bad URL.)
+            serverUrlStore.set(normalized)
             api.health()
             _testResult.value = ServerTestResult.Success(System.currentTimeMillis() - start)
         } catch (e: HttpException) {
@@ -75,14 +82,5 @@ class OnboardingViewModel @Inject constructor(
     suspend fun saveAndContinue(onSaved: () -> Unit) {
         serverUrlStore.set(_serverUrl.value.trim())
         onSaved()
-    }
-
-    private fun isValidUrl(url: String): Boolean {
-        if (!url.startsWith("https://") && !url.startsWith("http://")) return false
-        val host = url
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .substringBefore('/')
-        return host.isNotBlank() && host.contains('.')
     }
 }

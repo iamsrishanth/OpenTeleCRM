@@ -59,18 +59,23 @@ class ServerSettingsViewModel @Inject constructor(
 
     /** Validates the URL and probes the server health endpoint; on success records lastGoodUrl. */
     suspend fun testConnection() {
-        val url = _serverUrl.value.trim()
-        if (!isValidUrl(url)) {
-            _testResult.value = ServerTestResult.Failure("Enter a valid server URL (https://your-server/autoupdate/v2)")
+        val raw = _serverUrl.value.trim()
+        val normalized = try {
+            ServerUrlStore.normalize(raw)
+        } catch (e: IllegalArgumentException) {
+            _testResult.value = ServerTestResult.Failure(e.message ?: "Enter a valid server URL")
             return
         }
+        _serverUrl.value = normalized
         _testing.value = true
         _testResult.value = ServerTestResult.Testing
         val start = System.currentTimeMillis()
         try {
+            // Persist first so the ServerUrlInterceptor targets the tested URL.
+            serverUrlStore.set(normalized)
             api.health()
             _testResult.value = ServerTestResult.Success(System.currentTimeMillis() - start)
-            _lastGoodUrl.value = url
+            _lastGoodUrl.value = normalized
         } catch (e: HttpException) {
             _testResult.value = ServerTestResult.Failure("Server responded with HTTP ${e.code()}")
         } catch (e: Exception) {

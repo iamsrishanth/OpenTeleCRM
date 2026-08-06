@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds: allow cleartext HTTP to any LAN/loopback server the operator
+     types into Settings (emulator 10.0.2.2, adb-reverse 127.0.0.1, LAN IPs).
+     Release builds keep the strict main config (HTTPS-only). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
