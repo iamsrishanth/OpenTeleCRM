@@ -13,6 +13,7 @@ import com.opentelecrm.app.HomeScreen
 import com.opentelecrm.core.auth.SessionManager
 import com.opentelecrm.feature.auth.LoginRoute
 import com.opentelecrm.feature.auth.OnboardingRoute
+import com.opentelecrm.feature.dialer.DialerRoute
 import com.opentelecrm.feature.leads.LeadDetailRoute
 import com.opentelecrm.feature.leads.LeadsRoute
 import com.opentelecrm.feature.leads.TeamRoute
@@ -25,6 +26,7 @@ object Routes {
     const val LEADS = "leads"
     const val LEAD_DETAIL = "leads/{leadId}"
     const val TEAM = "team"
+    const val DIALER = "dialer"
     const val SETTINGS = "settings"
 
     fun leadDetail(leadId: String) = "leads/$leadId"
@@ -71,8 +73,12 @@ fun AppNavHost(sessionManager: SessionManager) {
                 LeadsRoute(
                     onLeadClick = { leadId -> navController.navigate(Routes.leadDetail(leadId)) },
                     onOpenTeam = { navController.navigate(Routes.TEAM) },
+                    onOpenDialer = { navController.navigate(Routes.DIALER) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 )
+            }
+            composable(Routes.DIALER) {
+                DialerRoute(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.LEAD_DETAIL,

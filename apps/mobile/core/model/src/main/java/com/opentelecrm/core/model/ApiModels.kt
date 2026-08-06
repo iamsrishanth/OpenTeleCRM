@@ -212,3 +212,146 @@ data class CustomAction(
 data class CustomActionsResponse(
     val data: List<CustomAction> = emptyList(),
 )
+
+// --- Telephony / Dialer (M3) — verified Aug 2026 via live API ---
+
+/** POST /dialer/next candidate. */
+@Serializable
+data class DialerCandidate(
+    val leadId: String,
+    val identifier: String? = null,
+    val phone: String? = null,
+    val score: Int? = null,
+    val reasons: List<String> = emptyList(),
+    val followUpDueAt: String? = null,
+    val slaBreachRisk: Int? = null,
+    val leadScore: Int? = null,
+    val freshnessHours: Double? = null,
+    val lastDialedAt: String? = null,
+)
+
+@Serializable
+data class DialerNextResponse(
+    val data: List<DialerCandidate> = emptyList(),
+)
+
+/** POST /dialer/{leadId}/dial response — callId is the provider's id, id the call row. */
+@Serializable
+data class DialResponse(
+    val callId: String? = null,
+    val id: String? = null,
+)
+
+@Serializable
+data class DialRequest(
+    val from: String? = null,
+)
+
+/** Valid disposition values (server-enforced; verified Aug 2026). */
+object Dispositions {
+    const val ANSWERED = "answered"
+    const val NO_ANSWER = "no_answer"
+    const val BUSY = "busy"
+    const val NOT_CONNECTED = "not_connected"
+    const val WRONG_NUMBER = "wrong_number"
+    const val NOT_INTERESTED = "not_interested"
+    const val CALLBACK = "callback"
+    const val DNC = "dnc"
+    const val CONVERTED = "converted"
+    const val FOLLOW_UP = "follow_up"
+    const val OTHER = "other"
+
+    val ALL: List<String> = listOf(
+        ANSWERED, NO_ANSWER, BUSY, NOT_CONNECTED, WRONG_NUMBER, NOT_INTERESTED,
+        CALLBACK, DNC, CONVERTED, FOLLOW_UP, OTHER,
+    )
+}
+
+@Serializable
+data class DispositionRequest(
+    val disposition: String,
+    val note: String? = null,
+)
+
+@Serializable
+data class DispositionResponse(
+    val data: JsonObject? = null,
+    val error: ApiError? = null,
+)
+
+/** GET /calls item. */
+@Serializable
+data class CallRecord(
+    val id: String,
+    val leadId: String? = null,
+    val direction: String? = null,
+    val status: String? = null,
+    val disposition: String? = null,
+    val phone: String? = null,
+    val startedAt: String? = null,
+    val endedAt: String? = null,
+    val durationSec: Int? = null,
+    val talkSec: Int? = null,
+    val ringSec: Int? = null,
+    val recordingId: String? = null,
+    val trunk: String? = null,
+    val did: String? = null,
+    val agentUserId: String? = null,
+    val note: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+)
+
+@Serializable
+data class CallListResponse(
+    val data: List<CallRecord> = emptyList(),
+    val total: Int = 0,
+)
+
+/** POST /callbacks body + response item. */
+@Serializable
+data class CallbackCreateRequest(
+    val leadId: String,
+    val quickChip: String? = null,
+    val note: String? = null,
+    val dueAt: String? = null,
+)
+
+@Serializable
+data class CallbackItem(
+    val id: String? = null,
+    val leadId: String? = null,
+    val dueAt: String? = null,
+    val status: String? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class CallbackListResponse(
+    val data: List<CallbackItem> = emptyList(),
+    val total: Int = 0,
+)
+
+/** GET /caller-id/{phone} — found + full lead with lastCalls/lastActions. */
+@Serializable
+data class CallerIdResponse(
+    val found: Boolean = false,
+    val lead: CallerIdLead? = null,
+)
+
+@Serializable
+data class CallerIdLead(
+    val id: String? = null,
+    val identifier: String? = null,
+    val score: Int? = null,
+    val stageId: String? = null,
+    val pipelineId: String? = null,
+    val ownerUserId: String? = null,
+    val source: String? = null,
+    val tags: List<String> = emptyList(),
+    val customFields: JsonObject = JsonObject(emptyMap()),
+    val lastCalls: List<JsonElement> = emptyList(),
+    val lastActions: List<JsonElement> = emptyList(),
+) {
+    fun name(): String? = (customFields["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+}

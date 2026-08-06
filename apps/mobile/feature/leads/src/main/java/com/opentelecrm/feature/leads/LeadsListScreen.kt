@@ -60,6 +60,7 @@ import kotlinx.coroutines.CancellationException
 fun LeadsRoute(
     onLeadClick: (String) -> Unit,
     onOpenTeam: () -> Unit,
+    onOpenDialer: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: LeadsListViewModel = hiltViewModel(),
 ) {
@@ -86,6 +87,7 @@ fun LeadsRoute(
         onRetrySync = viewModel::retrySync,
         onLeadClick = onLeadClick,
         onOpenTeam = onOpenTeam,
+        onOpenDialer = onOpenDialer,
         onOpenSettings = onOpenSettings,
     )
 }
@@ -101,6 +103,7 @@ private fun LeadsListScreen(
     onRetrySync: () -> Unit,
     onLeadClick: (String) -> Unit,
     onOpenTeam: () -> Unit,
+    onOpenDialer: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Scaffold(
@@ -109,6 +112,7 @@ private fun LeadsListScreen(
                 title = { Text("Leads") },
                 actions = {
                     TextButton(onClick = onOpenTeam) { Text("Team") }
+                    TextButton(onClick = onOpenDialer) { Text("Dialer") }
                     TextButton(onClick = onOpenSettings) { Text("Settings") }
                     if (uiState.refreshing) {
                         CircularProgressIndicator(

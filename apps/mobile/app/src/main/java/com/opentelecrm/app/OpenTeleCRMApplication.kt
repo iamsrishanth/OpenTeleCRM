@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.opentelecrm.core.sync.WorkScheduler
+import com.opentelecrm.feature.dialer.CallerIdNotifier
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -22,7 +23,10 @@ class OpenTeleCRMApplication : Application(), Configuration.Provider {
         // Safety net: periodic outbox flush (15 min) so mutations queued while
         // offline are replayed even if no one-shot is scheduled later.
         scheduler.schedulePeriodic()
+        // M3: incoming-call caller-ID lookup (no-op until READ_PHONE_STATE granted).
+        callerIdNotifier.register()
     }
 
     @Inject lateinit var scheduler: WorkScheduler
+    @Inject lateinit var callerIdNotifier: CallerIdNotifier
 }

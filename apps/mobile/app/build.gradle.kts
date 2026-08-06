@@ -52,6 +52,7 @@ dependencies {
     implementation(project(":core:sync"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:leads"))
+    implementation(project(":feature:dialer"))
     implementation(project(":feature:settings"))
 
     implementation(platform(libs.compose.bom))
