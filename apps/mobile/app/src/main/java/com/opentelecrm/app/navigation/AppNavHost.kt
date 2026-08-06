@@ -1,8 +1,10 @@
 package com.opentelecrm.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,6 +16,7 @@ import com.opentelecrm.core.auth.SessionManager
 import com.opentelecrm.feature.auth.LoginRoute
 import com.opentelecrm.feature.auth.OnboardingRoute
 import com.opentelecrm.feature.dialer.DialerRoute
+import com.opentelecrm.feature.inbox.InboxRoute
 import com.opentelecrm.feature.leads.LeadDetailRoute
 import com.opentelecrm.feature.leads.LeadsRoute
 import com.opentelecrm.feature.leads.TeamRoute
@@ -27,6 +30,7 @@ object Routes {
     const val LEAD_DETAIL = "leads/{leadId}"
     const val TEAM = "team"
     const val DIALER = "dialer"
+    const val INBOX = "inbox"
     const val SETTINGS = "settings"
 
     fun leadDetail(leadId: String) = "leads/$leadId"
@@ -41,10 +45,29 @@ object Routes {
  * is the leads list (M1).
  */
 @Composable
-fun AppNavHost(sessionManager: SessionManager) {
+fun AppNavHost(
+    sessionManager: SessionManager,
+    deepLink: android.net.Uri? = null,
+) {
     val navController = rememberNavController()
     val session by sessionManager.session.collectAsStateWithLifecycle()
     val startDestination = if (session != null) Routes.LEADS else Routes.ONBOARDING
+
+    // M4: handle opentelecrm://lead/{leadId} deep links (push taps).
+    val deepLinkLeadId = remember(deepLink) {
+        deepLink?.let { uri ->
+            if (uri.scheme == "opentelecrm" && uri.host == "lead") {
+                uri.pathSegments.firstOrNull()
+            } else null
+        }
+    }
+    LaunchedEffect(deepLinkLeadId, session != null) {
+        val leadId = deepLinkLeadId ?: return@LaunchedEffect
+        if (session == null) return@LaunchedEffect
+        navController.navigate(Routes.leadDetail(leadId)) {
+            launchSingleTop = true
+        }
+    }
 
     key(session != null) {
         NavHost(
@@ -74,11 +97,15 @@ fun AppNavHost(sessionManager: SessionManager) {
                     onLeadClick = { leadId -> navController.navigate(Routes.leadDetail(leadId)) },
                     onOpenTeam = { navController.navigate(Routes.TEAM) },
                     onOpenDialer = { navController.navigate(Routes.DIALER) },
+                    onOpenInbox = { navController.navigate(Routes.INBOX) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 )
             }
             composable(Routes.DIALER) {
                 DialerRoute(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.INBOX) {
+                InboxRoute(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.LEAD_DETAIL,

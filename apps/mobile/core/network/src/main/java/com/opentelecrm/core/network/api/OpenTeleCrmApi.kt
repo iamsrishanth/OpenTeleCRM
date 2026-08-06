@@ -23,6 +23,11 @@ import com.opentelecrm.core.model.LeadSummary
 import com.opentelecrm.core.model.MetadataResponse
 import com.opentelecrm.core.model.TeamMembersResponse
 import com.opentelecrm.core.model.TokenExchangeResponse
+import com.opentelecrm.core.model.SendWhatsAppRequest
+import com.opentelecrm.core.model.SendWhatsAppResponse
+import com.opentelecrm.core.model.WhatsAppConversationResponse
+import com.opentelecrm.core.model.WhatsAppMessageResponse
+import com.opentelecrm.core.model.WhatsAppTemplatesResponse
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
@@ -134,6 +139,30 @@ interface OpenTeleCrmApi {
     /** GET /enterprise/{eid}/caller-id/{phone} — incoming-call lead lookup. */
     @GET("enterprise/{eid}/caller-id/{phone}")
     suspend fun callerId(@Path("eid") eid: String, @Path("phone") phone: String): CallerIdResponse
+
+    // --- WhatsApp / Inbox (M4) ---
+
+    /** GET /enterprise/{eid}/whatsapp/conversations — inbox list. */
+    @GET("enterprise/{eid}/whatsapp/conversations")
+    suspend fun whatsappConversations(@Path("eid") eid: String): WhatsAppConversationResponse
+
+    /** GET /enterprise/{eid}/whatsapp/conversations/{id}/messages — thread. */
+    @GET("enterprise/{eid}/whatsapp/conversations/{conversationId}/messages")
+    suspend fun whatsappMessages(
+        @Path("eid") eid: String,
+        @Path("conversationId") conversationId: String,
+    ): WhatsAppMessageResponse
+
+    /** POST /enterprise/{eid}/whatsapp/send — outbound text (mock/bridge driver). */
+    @POST("enterprise/{eid}/whatsapp/send")
+    suspend fun whatsappSend(
+        @Path("eid") eid: String,
+        @Body body: SendWhatsAppRequest,
+    ): SendWhatsAppResponse
+
+    /** GET /enterprise/{eid}/whatsapp/templates — approved templates. */
+    @GET("enterprise/{eid}/whatsapp/templates")
+    suspend fun whatsappTemplates(@Path("eid") eid: String): WhatsAppTemplatesResponse
 }
 
 @Serializable

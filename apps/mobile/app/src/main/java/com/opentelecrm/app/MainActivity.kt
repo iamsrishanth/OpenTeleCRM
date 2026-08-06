@@ -1,5 +1,6 @@
 package com.opentelecrm.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,8 +26,19 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { sessionManager.restore() }
         setContent {
             AppTheme {
-                AppNavHost(sessionManager = sessionManager)
+                AppNavHost(
+                    sessionManager = sessionManager,
+                    deepLink = deepLinkUri,
+                )
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        deepLinkUri = intent.data
+    }
+
+    private var deepLinkUri: android.net.Uri? = null
 }

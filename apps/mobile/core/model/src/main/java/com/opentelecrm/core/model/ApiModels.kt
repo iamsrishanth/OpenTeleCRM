@@ -355,3 +355,74 @@ data class CallerIdLead(
 ) {
     fun name(): String? = (customFields["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
 }
+
+// --- WhatsApp / Inbox (M4) — verified Aug 2026 via live API ---
+
+@Serializable
+data class WhatsAppConversation(
+    val id: String,
+    val contactJid: String? = null,
+    val contactName: String? = null,
+    val leadId: String? = null,
+    val lastMessageAt: String? = null,
+    val unreadCount: Int? = null,
+    val isGroup: Boolean = false,
+    val waSessionId: String? = null,
+    val screenName: String? = null,
+)
+
+@Serializable
+data class WhatsAppConversationResponse(
+    val data: List<WhatsAppConversation> = emptyList(),
+)
+
+@Serializable
+data class WhatsAppMessage(
+    val id: String,
+    val conversationId: String? = null,
+    val waMessageId: String? = null,
+    val direction: String? = null, // inbound | outbound
+    val type: String? = null, // text
+    val body: String? = null,
+    val status: String? = null,
+    val mediaUrl: String? = null,
+    val sentAt: String? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class WhatsAppMessageResponse(
+    val data: List<WhatsAppMessage> = emptyList(),
+)
+
+@Serializable
+data class SendWhatsAppRequest(
+    val contactJid: String,
+    val text: String,
+    val waSessionId: String? = null,
+)
+
+@Serializable
+data class SendWhatsAppResponse(
+    val data: JsonObject? = null,
+    val error: ApiError? = null,
+)
+
+@Serializable
+data class WhatsAppTemplate(
+    val id: String? = null,
+    val name: String,
+    val status: String? = null,
+    val category: String? = null,
+    val languageCode: String? = null,
+    val body: String? = null,
+    val header: String? = null,
+    val footer: String? = null,
+    val buttons: List<JsonElement> = emptyList(),
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class WhatsAppTemplatesResponse(
+    val data: List<WhatsAppTemplate> = emptyList(),
+)

@@ -61,6 +61,7 @@ fun LeadsRoute(
     onLeadClick: (String) -> Unit,
     onOpenTeam: () -> Unit,
     onOpenDialer: () -> Unit,
+    onOpenInbox: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: LeadsListViewModel = hiltViewModel(),
 ) {
@@ -88,6 +89,7 @@ fun LeadsRoute(
         onLeadClick = onLeadClick,
         onOpenTeam = onOpenTeam,
         onOpenDialer = onOpenDialer,
+        onOpenInbox = onOpenInbox,
         onOpenSettings = onOpenSettings,
     )
 }
@@ -104,6 +106,7 @@ private fun LeadsListScreen(
     onLeadClick: (String) -> Unit,
     onOpenTeam: () -> Unit,
     onOpenDialer: () -> Unit,
+    onOpenInbox: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Scaffold(
@@ -113,6 +116,7 @@ private fun LeadsListScreen(
                 actions = {
                     TextButton(onClick = onOpenTeam) { Text("Team") }
                     TextButton(onClick = onOpenDialer) { Text("Dialer") }
+                    TextButton(onClick = onOpenInbox) { Text("Inbox") }
                     TextButton(onClick = onOpenSettings) { Text("Settings") }
                     if (uiState.refreshing) {
                         CircularProgressIndicator(

@@ -25,6 +25,10 @@ class OpenTeleCRMApplication : Application(), Configuration.Provider {
         scheduler.schedulePeriodic()
         // M3: incoming-call caller-ID lookup (no-op until READ_PHONE_STATE granted).
         callerIdNotifier.register()
+        // M4: register with a UnifiedPush distributor (ntfy app) for push.
+        runCatching {
+            org.unifiedpush.android.connector.UnifiedPush.register(this, "opentelecrm", "", "")
+        }
     }
 
     @Inject lateinit var scheduler: WorkScheduler

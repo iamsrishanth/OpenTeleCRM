@@ -53,6 +53,7 @@ dependencies {
     implementation(project(":feature:auth"))
     implementation(project(":feature:leads"))
     implementation(project(":feature:dialer"))
+    implementation(project(":feature:inbox"))
     implementation(project(":feature:settings"))
 
     implementation(platform(libs.compose.bom))
@@ -70,6 +71,7 @@ dependencies {
     ksp(libs.hilt.work.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.core.splashscreen)
+    implementation(libs.unifiedpush.connector)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
