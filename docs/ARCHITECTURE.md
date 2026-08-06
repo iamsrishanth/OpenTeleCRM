@@ -125,9 +125,9 @@ flowchart LR
 flowchart TD
   IN[HTTP request<br/>Authorization: Bearer ***]
   AH[AuthGuard<br/>global APP_GUARD]
-  PUB{@Public?}
+  PUB{isPublic?}
   H[HealthController<br/>/health]
-  MD[MetadataController<br/>/enterprise/:eid/{metadata,<br/>custom-fields,<br/>lead-stage-pipeline}]
+  MD[MetadataController<br/>enterprise/:eid metadata,<br/>custom-fields,<br/>lead-stage-pipeline]
   DM[DatabaseModule<br/>Global · DB_PROVIDER<br/>+ TENANT_WRAPPER]
   WT[withTenant eid<br/>BEGIN + SET app.enterprise_id]
   Pg[(Postgres<br/>RLS <enterprise_id>)]
@@ -182,7 +182,7 @@ flowchart TD
   C[MCP client]
   T[StreamableHTTPServerTransport<br/>POST /mcp · SSE responses]
   S[McpServer 'opentelecrm' v0.1.0]
-  TC{tenant() → withTenant ENTERPRISE_ID}
+  TC{tenant scope → withTenant ENTERPRISE_ID}
   DB[(Postgres<br/>RLS <enterprise_id>)]
   T2[13 parity tools]
 

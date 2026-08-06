@@ -88,9 +88,9 @@ flowchart LR
     API --> DB[(PostgreSQL 16/17<br/>28 RLS-FORCE tenant tables)]
     MCP --> DB
     API --> BRIDGE[WhatsApp bridge<br/>services/whatsapp-bridge · :3098]
-    BRIDGE -.Baileys 7.x.-> WA[WhatsApp]
+    BRIDGE -.->|Baileys 7.x| WA[WhatsApp]
     API --> ARI[Asterisk 21 LTS · ARI<br/>infra/asterisk · :8088 loopback]
-    ARI -.SIP.-> PSTN[PSTN / SIP trunk]
+    ARI -.->|SIP| PSTN[PSTN / SIP trunk]
 ```
 
 Every request resolves a token → tenant, then reads through `withTenant(eid)` —
