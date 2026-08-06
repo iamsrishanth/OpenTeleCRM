@@ -90,7 +90,15 @@ export class LeadsController {
     if (f === 'tags') return sql`tags`;
     if (f === 'lostreasonid') return sql`lost_reason_id`;
     if (f === 'owneruserid') return sql`owner_user_id`;
+    if (f === 'createdat') return sql`created_at`;
+    if (f === 'updatedat') return sql`updated_at`;
     return sql`custom_fields->>${field}`;
+  }
+
+  /** Timestamp-typed columns need ::timestamp casts (not ::numeric) in range ops. */
+  private isTimestampField(field: string): boolean {
+    const f = field.toLowerCase();
+    return f === 'createdat' || f === 'updatedat';
   }
 
   private condition(f: SearchFilter) {
@@ -124,13 +132,19 @@ export class LeadsController {
       case 'contains':
         return sql`${expr} ilike ${'%' + String(f.value) + '%'}`;
       case 'gt':
-        return sql`${expr}::numeric > ${String(f.value)}::numeric`;
+        return this.isTimestampField(field)
+          ? sql`${expr}::timestamptz > ${String(f.value)}::timestamptz`
+          : sql`${expr}::numeric > ${String(f.value)}::numeric`;
       case 'lt':
-        return sql`${expr}::numeric < ${String(f.value)}::numeric`;
+        return this.isTimestampField(field)
+          ? sql`${expr}::timestamptz < ${String(f.value)}::timestamptz`
+          : sql`${expr}::numeric < ${String(f.value)}::numeric`;
       case 'in':
         return sql`${expr} = ANY(${f.value as string[]})`;
       case 'between':
-        return sql`${expr}::numeric BETWEEN ${String((f.value as unknown[])[0])}::numeric AND ${String((f.value as unknown[])[1])}::numeric`;
+        return this.isTimestampField(field)
+          ? sql`${expr}::timestamptz BETWEEN ${String((f.value as unknown[])[0])}::timestamptz AND ${String((f.value as unknown[])[1])}::timestamptz`
+          : sql`${expr}::numeric BETWEEN ${String((f.value as unknown[])[0])}::numeric AND ${String((f.value as unknown[])[1])}::numeric`;
       case 'isNull':
         return sql`${expr} IS NULL`;
       case 'regex':

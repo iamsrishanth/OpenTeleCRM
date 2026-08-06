@@ -249,6 +249,46 @@ describe('Sync POST /enterprise/:eid/lead/search', () => {
       expect(row.score).toBeGreaterThan(75);
     }
   });
+
+  it('searches by updatedAt gt against the real timestamp column (delta-sync cursor)', async () => {
+    // Create a lead, capture its updatedAt, then filter with gt <cursor> —
+    // the mobile app's delta sync relies on this returning 200 (was a 500
+    // because updatedAt fell through to custom_fields->> and ::numeric cast).
+    const identifier = '91' + unique();
+    const createRes = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ identifier }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = await createRes.json();
+    expect(created.status).toBe('CREATED');
+    const leadId = created.leadId ?? created.id;
+
+    const getRes = await fetch(
+      `${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead/${leadId}`,
+      { headers: headers() },
+    );
+    expect(getRes.status).toBe(200);
+    const lead = await getRes.json();
+    const cursor = lead.updatedAt as string;
+    expect(typeof cursor).toBe('string');
+
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/lead/search`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        filters: [{ field: 'updatedAt', op: 'gt', value: cursor }],
+        skip: 0,
+        limit: 25,
+      }),
+    });
+    expect(res.status).toBe(200); // timestamp cast, not numeric — no 500
+    const body = await res.json();
+    for (const row of body.data) {
+      expect(row.updatedAt).toBeTruthy();
+    }
+  });
 });
 
 describe('Sync actions batch', () => {
