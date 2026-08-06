@@ -50,6 +50,7 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":core:database"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:leads"))
     implementation(project(":feature:settings"))
 
     implementation(platform(libs.compose.bom))

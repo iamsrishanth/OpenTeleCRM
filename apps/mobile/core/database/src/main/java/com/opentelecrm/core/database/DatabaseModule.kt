@@ -26,4 +26,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSyncStateDao(db: AppDatabase): SyncStateDao = db.syncStateDao()
+
+    @Provides
+    fun provideLeadDao(db: AppDatabase): LeadDao = db.leadDao()
 }

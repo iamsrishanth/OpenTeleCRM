@@ -16,7 +16,10 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onNavigateToSettings: () -> Unit) {
+fun HomeScreen(
+    onNavigateToLeads: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("OpenTeleCRM") }) },
     ) { innerPadding ->
@@ -30,8 +33,14 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         ) {
             Text(text = "Signed in (M0 placeholder)")
             Button(
-                onClick = onNavigateToSettings,
+                onClick = onNavigateToLeads,
                 modifier = Modifier.padding(top = 16.dp),
+            ) {
+                Text("Leads")
+            }
+            Button(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.padding(top = 8.dp),
             ) {
                 Text("Settings")
             }
