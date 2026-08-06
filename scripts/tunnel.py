@@ -111,7 +111,7 @@ def require(env: dict, key: str, hint: str) -> str:
 
 
 def find_zone_id(token: str, hostname: str) -> str:
-    domain = hostname.split(".", 1)[1]  # crm.weblaze.co.in -> weblaze.co.in
+    domain = hostname.split(".", 1)[1]  # strip the subdomain: host.zone -> zone
     r = cf("GET", f"https://api.cloudflare.com/client/v4/zones?name={domain}", token)
     zones = (r.get("result") or []) if r.get("success") else []
     if not zones:
