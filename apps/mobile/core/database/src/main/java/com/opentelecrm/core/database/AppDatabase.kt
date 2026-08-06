@@ -1,0 +1,17 @@
+package com.opentelecrm.core.database
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+
+/**
+ * App-wide Room database. Holds only sync bookkeeping for now (delta-sync cursors, M1);
+ * domain data is fetched fresh from the server per session.
+ */
+@Database(
+    entities = [SyncStateEntity::class],
+    version = 1,
+    exportSchema = false,
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun syncStateDao(): SyncStateDao
+}

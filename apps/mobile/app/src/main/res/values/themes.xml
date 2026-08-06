@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        M0: plain XML theme (no appcompat/material XML dependency).
+        Compose provides Material3 at runtime; this theme only drives the
+        splash screen and window chrome before/behind Compose.
+    -->
+    <style name="Theme.OpenTeleCRM" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

@@ -45,3 +45,10 @@ infra/docker/volumes/
 # graphify tool debris
 .graphify_*
 graphify-out/
+
+# Android mobile app (apps/mobile)
+apps/mobile/local.properties
+apps/mobile/.gradle/
+apps/mobile/**/build/
+apps/mobile/.kotlin/
+apps/mobile/captures/
