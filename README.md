@@ -42,6 +42,47 @@ npx @usebruno/cli run --env local -r .       # 27 requests, 58 assertions
 
 ---
 
+## Tunnel mode (route API calls through a Cloudflare tunnel)
+
+The web app can talk to the API through a Cloudflare tunnel instead of the
+local `http://localhost:3005` origin. Both modes are configurable via env; the
+tunnel hostname is set at runtime and never committed.
+
+| Mode | What it does |
+|------|--------------|
+| `make tunnel` | Writes `apps/web/.env.local` (`NEXT_PUBLIC_API_ACCESS=tunnel` + the tunnel origin) and points `PUBLIC_BASE_URL` at the tunnel in the root `.env`. Restart the web dev server afterwards. |
+| `make untunnel` | Removes `apps/web/.env.local` and restores the previous root `.env` (backed up as `.env.tunnel.bak` by `make tunnel`). |
+
+**Setup (one-time, host-side):**
+
+1. Create a gitignored `.tunnel-host` file containing the tunnel origin, e.g.
+   `https://crm.example.com` (no path — `/autoupdate/v2` is appended by the
+   web app). This file is never committed.
+2. Point the Cloudflare tunnel at the local API (`http://127.0.0.1:3005`) for
+   your hostname — e.g. a named-tunnel ingress rule or a dashboard public
+   hostname, exactly like any other service on this machine.
+3. Run `make tunnel`, restart the web dev server, and the web app's API calls
+   flow through the tunnel.
+
+**Security notes (read before enabling):**
+
+- While the tunnel is up, the API is reachable from the public internet. JWT /
+  API-token auth is still enforced, but the dev-mode surface (dev JWT secret,
+  mock drivers, rate limits) is exposed — never run the tunnel with production
+  credentials.
+- The tunnel origin and any Cloudflare credentials live ONLY in gitignored
+  files (`.tunnel-host`, `.env`, `.env.local`, `/etc/cloudflared/token`). They
+  must never be committed, and this README intentionally shows a placeholder
+  hostname. `make tunnel` never prints or stores a token.
+- When tunnel mode is on, `NEXT_PUBLIC_*` values are baked into the Next.js
+  bundle at build time — do not run `next build` with tunnel mode active (the
+  origin would be embedded in the production bundle). Dev mode only needs a
+  dev-server restart.
+- To expose the API to other clients (Bruno, scripts), paste the tunnel origin
+  into their env config; never commit it.
+
+---
+
 ## Architecture
 
 A Turborepo monorepo (`pnpm`, `turbo run …`). ESM-only, Node ≥ 22.

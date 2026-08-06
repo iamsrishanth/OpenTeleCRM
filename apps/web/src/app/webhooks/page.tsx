@@ -40,14 +40,9 @@ import {
 } from '@/components/ui/table'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { API_BASE, PUBLIC_BASE } from '@/lib/config'
 import { asList, type AutomationRule, type AutomationRun } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3005/autoupdate/v2'
-
-/** Public inbound webhook root — the API server root (no /autoupdate/v2 prefix). */
-const PUBLIC_BASE = API_BASE.replace(/\/autoupdate\/v2\/?$/, '')
 
 // ---------------------------------------------------------------------------
 // Vocabulary (mirrors services/api/src/automation/types.ts)
