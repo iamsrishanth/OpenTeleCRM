@@ -1,39 +1,126 @@
 # OpenTeleCRM
 
-**1:1 FOSS clone of TeleCRM** — a telecalling-first sales CRM. Multi-tenant from line one, self-hosted natively (no Docker), PostgreSQL with RLS.
+**The self-hosted, drop-in replacement for TeleCRM.** A telecalling-first sales CRM for teams that live on the phone — leads, dialer, WhatsApp, automation — with your data on your hardware and an API your existing integrations already speak.
 
-| Surface | Status | Details |
-|---------|--------|---------|
-| REST API | ✅ 103/103 tests | NestJS + Fastify, /autoupdate/v2, port 3005 |
-| JSON-RPC MCP | ✅ 15/15 tests · 13 tools | Streamable HTTP, port 3100 (dev) |
-| Web app | ✅ built | Next.js agent desk + admin console, port 3000 |
-| WhatsApp | ✅ 22/22 tests · live | Standalone deploy-anywhere bridge (Baileys 7.x), port 3098 |
-| Telephony | ✅ 11/11 + live ARI | Dialer + callbacks, live Asterisk ARI wiring (native build) |
-| Automation | ✅ 103/103 incl. quota | Rules engine, scheduler, distribution, webhook, quota metering, sequences |
-| Mobile app | ✅ M0–M5 shipped | Kotlin native (Compose), offline-first, F-Droid metadata |
-| Bruno collection | ✅ 27 reqs, 26 assertions | TeleCRM wire-compatible |
+![License](https://img.shields.io/github/license/iamsrishanth/OpenTeleCRM)
+![Node](https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2F17-4169E1?logo=postgresql&logoColor=white)
+![Android](https://img.shields.io/badge/Android-Kotlin%202.0-7F52FF?logo=kotlin&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-151-2ea44f)
+![Self-hosted](https://img.shields.io/badge/self--hosted-native-blueviolet)
 
 ---
 
+## Table of contents
+
+- [What is OpenTeleCRM?](#what-is-opentelecrm)
+- [See it in action](#see-it-in-action)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [TeleCRM parity](#telecrm-parity)
+- [Roadmap](#roadmap)
+- [Documentation](#documentation)
+- [Tunnel mode](#tunnel-mode)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## What is OpenTeleCRM?
+
+OpenTeleCRM is a **1:1 open-source clone of TeleCRM** — the telecalling-first sales
+CRM used by thousands of Indian sales teams — rebuilt clean-room against the
+documented API surface, self-hosted **natively** (no Docker), and multi-tenant
+from line one.
+
+It answers the three questions every telecalling operation asks:
+
+| | |
+|---|---|
+| **🔐 Your data, your rules** | Runs on your hardware (Debian/Ubuntu, systemd, native binaries — no containers). Every table is tenant-isolated by PostgreSQL Row-Level Security, `FORCE`d so even the DB owner can't cross tenants. |
+| **🔌 Wire-compatible, not look-alike** | The REST (`/autoupdate/v2`) and MCP surfaces match TeleCRM's API shapes, so existing integrations, scripts, and Postman/Bruno collections keep working — verified by a 27-request, 26-assertion Bruno collection that runs green against the live API. |
+| **📞 Live channels, not mocks** | Real WhatsApp outbound through a standalone, deploy-anywhere Baileys bridge. Real calls through a source-built Asterisk 21 PBX over ARI, with caller-ID, callbacks, and TRAI-window-aware dialer scoring. |
+
+The parity promise is **compatible surface, not bug-compatible behavior**: where
+TeleCRM silently drops async writes, caps tokens at 3, or expires MCP tokens in
+30 days with no renewal, OpenTeleCRM deliberately fixes it (see
+[docs/PARITY.md § Divergences](docs/PARITY.md)).
+
+## See it in action
+
+Agent desk (dark theme) — dashboard, callbacks queue, automation rules, all
+rendered against the seeded demo workspace:
+
+![OpenTeleCRM agent desk — dashboard with live stats](assets/screenshots/dashboard.png)
+
+![OpenTeleCRM agent desk — follow-up callbacks queue](assets/screenshots/callbacks.png)
+
+![OpenTeleCRM agent desk — automation rules with visual builder](assets/screenshots/automations.png)
+
+## Features
+
+| Area | What you get |
+|------|--------------|
+| **Multi-tenant foundation** | 28 RLS-`FORCE`d tenant tables, `withTenant()` transaction wrapper, deterministic seed (1 enterprise · 5,000 leads · 3 users · 2 pipelines · 20 custom fields) |
+| **Sync API** | TeleCRM-parity `POST/GET/PUT/DELETE` under `/autoupdate/v2` — leads CRUD + upsert-by-identifier + search, actions batch CRUD, team members, custom fields/actions — with per-item `CREATED\|IGNORED\|UPDATED\|REJECTED` status + `remarks[]` |
+| **Async API** | Fire-and-forget `autoupdatelead` → `requestId`, `?validate=true` dry-run (zero writes), `X-Strict-Mode` 422, ingest log + per-field outcomes |
+| **MCP server** | 13 TeleCRM-parity tools (Streamable HTTP, RLS-scoped) — drive the CRM from Cursor, Claude, or any MCP client |
+| **WhatsApp** | Send, unified inbox with auto lead-attribution, templates, broadcasts with consent ledger, drip sequences — plus a **standalone bridge** (Baileys 7.x, own session + queue) you can deploy on any Linux box |
+| **Telephony** | Smart dialer (score + TRAI-window + DND suppression), live caller-ID, follow-up callbacks, call tracking, recordings (signed URLs) — **live calls via Asterisk ARI** |
+| **Automation** | Pure-TS rule engine, 9 event kinds, 10 action executors, lead distribution (round-robin / least-loaded / skill-match), public webhooks + replay, 60s scheduler, per-tenant quota metering, 10 seeded templates, **React Flow visual builder** |
+| **Web agent desk** | Next.js app: dashboard with real stats, leads (search/filter/score), dialer call pad, WhatsApp inbox, automations + builder, sequences, templates, broadcasts, callbacks, webhooks, settings |
+| **Mobile app** | Kotlin-native Android client (Compose): offline-first Room cache + outbox, caller-ID heads-up, dialer with dispositions, WhatsApp inbox, UnifiedPush, F-Droid metadata — verified on-device |
+
+## Architecture
+
+A pnpm + Turborepo monorepo, ESM-only, Node ≥ 22. One Postgres database, one
+tenant-scoping discipline:
+
+```mermaid
+flowchart LR
+    WEB[Next.js agent desk<br/>apps/web · :3000] --> API[NestJS API<br/>services/api · :3005]
+    MOB[Kotlin mobile app<br/>apps/mobile] --> API
+    MCPC[MCP clients] -->|JSON-RPC /mcp| MCP[MCP server<br/>services/mcp · :3100]
+    API --> DB[(PostgreSQL 16/17<br/>28 RLS-FORCE tenant tables)]
+    MCP --> DB
+    API --> BRIDGE[WhatsApp bridge<br/>services/whatsapp-bridge · :3098]
+    BRIDGE -.Baileys 7.x.-> WA[WhatsApp]
+    API --> ARI[Asterisk 21 LTS · ARI<br/>infra/asterisk · :8088 loopback]
+    ARI -.SIP.-> PSTN[PSTN / SIP trunk]
+```
+
+Every request resolves a token → tenant, then reads through `withTenant(eid)` —
+a transaction that sets `app.enterprise_id` so RLS returns only that tenant's
+rows. Missing tenant context returns **zero rows**, not a leak.
+
+Full detail — C4 diagrams, data flow, ports, future containers:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 ## Quick start
 
-```bash
-make setup      # provision deps + install + db-init + db-migrate + db-seed
-make dev        # API on :3005 (web desk: pnpm --filter @opentelecrm/web dev → :3000)
-pnpm test       # 103 API + 15 MCP + 22 whatsapp + 11 telephony tests
-```
-
-Or step by step:
+**Prerequisites:** Debian/Ubuntu (or any Linux), Node.js ≥ 22 (corepack pnpm),
+PostgreSQL 16 or 17, ~10 minutes.
 
 ```bash
-make provision         # system deps (Debian)
-make install           # pnpm install
-make db-init           # create DB + role
-make db-migrate        # Drizzle migrations
-make db-seed           # demo enterprise, 5000 leads, 3 users, 2 pipelines
+git clone https://github.com/iamsrishanth/OpenTeleCRM.git
+cd OpenTeleCRM
+
+make setup      # provision system deps + pnpm install + db-init + db-migrate + db-seed
+make dev        # API on :3005  (web desk: pnpm --filter @opentelecrm/web dev → :3000)
+pnpm test       # 151 tests across API / MCP / whatsapp / telephony
 ```
 
-### Bruno collection
+`make setup` is a one-shot: it provisions native deps, installs JS deps,
+creates the DB role, runs all 8 migrations, and seeds a demo workspace (5,000
+leads, 3 users, 2 pipelines). Step-by-step targets (`make provision`, `make
+install`, `make db-init`, `make db-migrate`, `make db-seed`) exist if you'd
+rather run them separately.
+
+**Bruno collection** (wire-compatibility proof):
 
 ```bash
 cd collections/opentelecrm
@@ -41,180 +128,91 @@ bash ../../scripts/bruno-bootstrap-jwt.sh   # inject a dev JWT
 npx @usebruno/cli run --env local -r .       # 27 requests, 26 assertions
 ```
 
----
-
-## Tunnel mode (route API calls through a Cloudflare tunnel)
-
-The web app can talk to the API through a Cloudflare tunnel instead of the
-local `http://localhost:3005` origin. Both modes are configurable via env; the
-tunnel hostname is set at runtime and never committed.
-
-| Mode | What it does |
-|------|--------------|
-| `make tunnel` | Writes `apps/web/.env.local` (`NEXT_PUBLIC_API_ACCESS=tunnel` + the tunnel origin) and points `PUBLIC_BASE_URL` at the tunnel in the root `.env`. Restart the web dev server afterwards. |
-| `make untunnel` | Removes `apps/web/.env.local` and restores the previous root `.env` (backed up as `.env.tunnel.bak` by `make tunnel`). |
-
-**Setup (one-time, host-side):**
-
-1. Add the Cloudflare values to your local `.env` (gitignored — never committed):
-   - `TUNNEL_BASE_URL` — the tunnel origin, e.g. `https://crm.example.com` (no path)
-   - `CLOUDFLARE_API_TOKEN` — API token with `DNS:Edit` + `Cloudflare Tunnel:Write` scope
-   - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_TUNNEL_ID`, `CLOUDFLARE_ZONE_ID` — from your Zero Trust dashboard (zone ID is auto-detected if left blank)
-   - `CLOUDFLARE_TUNNEL_TOKEN` — optional; when set, `make tunnel` installs the cloudflared systemd connector with it
-2. Run `make tunnel`. It calls the Cloudflare API with your token to ensure the DNS
-   CNAME + tunnel ingress rule exist for your hostname (pointing at
-   `http://127.0.0.1:3005`), then flips the web app into tunnel mode.
-3. Restart the web dev server.
-
-Both the token and the domain come from `.env` — the tunnel never ships with
-code files, and `scripts/tunnel.py` contains no hostname, token, or account ID.
-
-**Security notes (read before enabling):**
-
-- While the tunnel is up, the API is reachable from the public internet. JWT /
-  API-token auth is still enforced, but the dev-mode surface (dev JWT secret,
-  mock drivers, rate limits) is exposed — never run the tunnel with production
-  credentials.
-- The tunnel origin and any Cloudflare credentials live ONLY in gitignored
-  files (`.env`, `.env.local`, `/etc/cloudflared/token`). They
-  must never be committed, and this README intentionally shows a placeholder
-  hostname. `make tunnel` never prints or stores a token.
-- When tunnel mode is on, `NEXT_PUBLIC_*` values are baked into the Next.js
-  bundle at build time — do not run `next build` with tunnel mode active (the
-  origin would be embedded in the production bundle). Dev mode only needs a
-  dev-server restart.
-- To expose the API to other clients (Bruno, scripts), paste the tunnel origin
-  into their env config; never commit it.
-
----
-
-## Architecture
-
-A Turborepo monorepo (`pnpm`, `turbo run …`). ESM-only, Node ≥ 22.
-
-```
-opentelecrm/
-├── services/
-│   ├── api/              # NestJS REST API  (Fastify, :3005)
-│   ├── mcp/              # JSON-RPC MCP     (:3100 dev)
-│   ├── whatsapp/         # WhatsApp drivers (mock / wwebjs / baileys / bridge)
-│   ├── whatsapp-bridge/  # STANDALONE deploy-anywhere bridge (Baileys 7.x, :3098)
-│   ├── telephony/        # Dialer scoring + Asterisk ARI provider (live)
-│   ├── ai/               # (empty scaffold — P7 AI & voice)
-│   ├── analytics/        # (empty scaffold — P6 reports)
-│   ├── automation/       # (empty scaffold — ADR-0007 Temporal worker home)
-│   ├── ingest/           # (empty scaffold — P5 lead capture)
-│   ├── notifier/         # (empty scaffold — notifications)
-│   └── voice-agent/      # (empty scaffold — P7 voice)
-├── packages/
-│   ├── db/               # Drizzle schema, RLS, migrations, seed data
-│   ├── contracts/        # Shared wire types (WhatsApp/Telephony/Automation)
-│   ├── core-domain/      # Domain types mirroring TeleCRM's model
-│   ├── rule-engine/      # Pure-TS automation evaluator
-│   ├── connectors/       # (empty scaffold — P5 capture connectors)
-│   ├── i18n/             # (empty scaffold)
-│   ├── phone/            # (empty scaffold)
-│   ├── sdk-ts/           # (empty scaffold)
-│   ├── testing/          # (empty scaffold)
-│   └── ui/               # (empty scaffold)
-├── apps/
-│   ├── web/              # Next.js agent desk (:3000)
-│   ├── mobile/           # Kotlin native Android app (Compose, offline-first)
-│   ├── docs/             # (empty scaffold — help center)
-│   ├── extension/        # (empty scaffold — A1.4 click-to-call)
-│   └── widget/           # (empty scaffold — A2.7 website widget)
-├── infra/
-│   ├── asterisk/         # Native Asterisk provision (source build on Debian 13)
-│   ├── whatsapp-bridge/  # systemd unit for the standalone bridge
-│   ├── ansible/          # (empty scaffold — fleet-grade path)
-│   ├── helm/             # (empty scaffold)
-│   ├── native/           # (empty scaffold — binary installers)
-│   ├── observability/    # (empty scaffold — metrics/logs)
-│   └── terraform/        # (empty scaffold)
-├── collections/          # Bruno API test collection
-├── fdroid/               # F-Droid metadata (com.opentelecrm.app)
-├── docs/                 # ARCHITECTURE.md, PARITY.md, ROADMAP.md, ADRs, phase records
-└── scripts/              # provision/, db/, tunnel, bruno helpers
-```
-
-### Live provider wiring (operator env)
-
-- **WhatsApp** — `services/whatsapp-bridge` is a standalone Baileys 7.x bridge with
-  its own HTTP API (`/health`, `/send`, `/messages`, `/typing`), own session
-  (file-backed creds), own inbound queue. Deploy on any Linux host (Node 18+,
-  native, no Docker): see `services/whatsapp-bridge/README.md`. The API's
-  `bridge` driver (`WHATSAPP_DRIVER=bridge`, `WHATSAPP_BRIDGE_URL=…`) sends
-  outbound + polls inbound for chat sync. Baileys 7.x pairs business/smba
-  numbers that 6.x rejects (401). Direct in-process pairing is also supported
-  (`pnpm --filter @opentelecrm/whatsapp pair -- --code <phone>`).
-- **Asterisk** — Debian 13 ships no asterisk binary package, so the repo
-  builds Asterisk 21 LTS from source (`infra/asterisk/provision/build-asterisk-source.sh`),
-  configures ARI + Stasis, and the API places real calls
-  (`POST /dialer/:leadId/dial` → ARI originate) with a Stasis event bridge
-  updating call rows. A real SIP trunk is operator config (`TELEPHONY_ARI_TRUNK`).
-
-### Auth flow
-
-1. **Dev JWT** — HS256 signed with `DEV_JWT_SECRET`, used in local dev + Bruno
-2. **API tokens** — `telekrm_async_` / `telekrm_sync_` tokens, stored as SHA-256 hash
-3. **Enterprise-secret exchange** — `POST /auth/exchange` mints a sync token from the
-   seeded demo secret (mobile onboarding path, migration 0007)
-4. **OIDC** — Zitadel id-tokens (future)
-
-All requests route through `AuthGuard` + RLS via `withTenant(eid)` — no row can leak across tenants.
-
-### TeleCRM parity
+## TeleCRM parity
 
 | Area | Status |
 |------|--------|
-| Foundation (multi-tenant, RLS, seed data) | ✅ |
+| Foundation (multi-tenant, RLS, seed) | ✅ |
 | Lead CRUD + search + upsert | ✅ |
 | Action logging (note, call, WhatsApp) | ✅ |
 | Async autoupdate + validation | ✅ |
-| API token management | ✅ |
-| Team member list | ✅ |
-| Custom actions | ✅ |
-| WhatsApp (send, conversations, templates, broadcasts, sequences) | ✅ — live outbound via standalone bridge |
-| Telephony (calls, dialer, callbacks, recordings) | ✅ — live Asterisk ARI dialing |
+| API token management (20-token cap, D2 fix) | ✅ |
+| Custom fields / team / workspace settings | ✅ |
+| WhatsApp (send, inbox, templates, broadcasts, sequences) | ✅ live outbound |
+| Telephony (calls, dialer, caller-ID, callbacks, recordings) | ✅ live ARI dialing |
 | Automation (rules, schedule, distribution, webhook, quota) | ✅ |
-| Web app | ✅ — full agent desk + admin console |
-| Mobile app | ✅ — Kotlin native client (M0–M5) |
-| Widget / extension / docs | 🚧 — empty scaffolds, not started |
+| Web app + mobile app | ✅ |
+| Widget / browser extension | 🚧 planned |
+| AI & voice / reports / billing / migration tooling | 🚧 roadmap (P5–P10) |
 
-Full detail: [docs/PARITY.md](./docs/PARITY.md) · Roadmap: [docs/ROADMAP.md](./docs/ROADMAP.md)
+Full matrix with per-feature test IDs: [docs/PARITY.md](docs/PARITY.md)
 
----
+## Roadmap
 
-## Test surface
+Shipped: **P0–P4** (foundation → core CRM → WhatsApp → telephony → automation),
+**P4b** (web desk, visual builder, sequences, quota metering, live
+Asterisk/WhatsApp wiring), **P8 mobile** (ahead of plan, as Kotlin native).
+
+Next up: **P5 lead capture** (connector SDK, persistent ingest log, webhook /
+CSV / missed-call / email / FB Lead Ads connectors). Then P6 analytics, P7
+AI & voice, P9 admin/migration/SaaS, P10 hardening & launch.
+
+Per-phase scope + exit criteria: [docs/ROADMAP.md](docs/ROADMAP.md)
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/README.md](docs/README.md) | Documentation index + conventions |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | C4 architecture, data flow, ports |
+| [docs/PARITY.md](docs/PARITY.md) | TeleCRM parity matrix + divergences |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What's shipped / what's next (P0–P10) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | ADR log (ADR-0001 → ADR-0030) |
+| [docs/RISKS.md](docs/RISKS.md) | Risk register (WhatsApp ToS, recording privacy, RLS) |
+| [docs/LICENSES.md](docs/LICENSES.md) | License posture for every component |
+| [services/whatsapp-bridge/README.md](services/whatsapp-bridge/README.md) | Deploy-anywhere WhatsApp bridge |
+| [infra/asterisk/README.md](infra/asterisk/README.md) | Asterisk 21 PBX scaffold |
+| [apps/mobile/README.md](apps/mobile/README.md) | Android client (modules, build, F-Droid) |
+
+## Tunnel mode
+
+Optional: route the web app's API calls through a Cloudflare tunnel instead of
+`localhost:3005` — for demos or remote teams.
 
 ```bash
-pnpm test              # all workspace tests (103 API + 15 MCP + 22 whatsapp + 11 telephony)
-cd services/api && npx vitest run --config vitest.contract.config.ts  # focused: 103 tests, 13 files
-make typecheck         # tsc --noEmit across all workspaces
-pnpm lint              # Biome (services + packages; apps/web uses eslint)
+make tunnel      # ensure DNS CNAME + ingress, flip web app to tunnel mode
+make untunnel    # revert
 ```
 
-Tests spin up the real API (dev JWT + seeded DB), hit `authGuard` + RLS — no mocking.
+The tunnel origin and all Cloudflare credentials live **only** in gitignored
+files (`.env`, `apps/web/.env.local`, `/etc/cloudflared/token`) — never
+committed, never printed. While the tunnel is up the API is publicly reachable,
+so never run it with production credentials, and never `next build` with tunnel
+mode active (the origin would bake into the bundle).
 
----
+## Contributing
 
-## Tech stack
+Contributions are welcome — this is a young project and the roadmap is long.
 
-- **Runtime** — Node.js ≥ 22, ESM
-- **Package management** — pnpm + Turborepo
-- **API** — NestJS 10 + Fastify adapter
-- **DB** — PostgreSQL 16 (provisioner) / 17 (host), Drizzle ORM + Drizzle Kit, native RLS
-- **Auth** — HS256 JWTs + SHA-256 API tokens + Zitadel OIDC (future)
-- **Deps** — TypeScript 5.7, Biome, Vitest
-- **WhatsApp** — standalone Baileys 7.x bridge (deploy-anywhere) + drivers
-- **Telephony** — native Asterisk 21 LTS + ARI (source-built on Debian 13)
-- **Mobile** — Kotlin 2.0, Compose, Room, WorkManager, UnifiedPush (see `apps/mobile/README.md`)
-- **Infra** — Native Debian 13, systemd units, no Docker
-
----
+1. **Fork → branch → PR** (conventional commits).
+2. **The gate is green or the PR doesn't land:** `pnpm test` (151), `make
+   typecheck`, `pnpm lint` (Biome for services/packages; eslint for `apps/web`).
+3. **Docs update in the same commit as the feature** — test counts, tables,
+   ports, and statuses in README/PARITY/ROADMAP must not drift (see
+   [docs/README.md](docs/README.md) conventions).
+4. **No Docker, ever** — native provisioners + systemd only (ADR-0001).
+5. **No secrets** — `.env*`, tunnel hostnames, `*.mcp` tokens, and the mobile
+   release keystore are gitignored; a PR that commits any of them will be
+   rejected.
 
 ## License
 
-AGPL-3.0 — see [LICENSE](./LICENSE) and [docs/LICENSES.md](./docs/LICENSES.md).
+**AGPL-3.0** — see [LICENSE](LICENSE) and [docs/LICENSES.md](docs/LICENSES.md).
 
-This is not affiliated with TeleCRM. It is an independent, clean-room implementation of the documented API surface for self-hosted use.
+OpenTeleCRM is **not affiliated with TeleCRM**. It is an independent,
+clean-room implementation of TeleCRM's documented API surface for self-hosted
+use. TeleCRM is a trademark of its respective owner.
+
+---
+
+<p align="center"><sub>Built for teams that live on the phone. 🍜</sub></p>
