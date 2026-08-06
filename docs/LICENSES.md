@@ -12,7 +12,7 @@ stack. Column meanings:
 - **Risk note** — anything a legal review should look at first.
 
 This file is a **technical inventory, not legal advice**. Version numbers are
-the workspace ranges / declared versions from the five `package.json` files in
+the workspace ranges / declared versions from the eleven `package.json` files in
 the repo at time of writing; they are `^`-ranges, so the lockfile
 (`pnpm-lock.yaml`) pins the exact installed patch. Third-party infra components
 are planned and not yet vendored; versions shown are target stable series and
@@ -26,21 +26,28 @@ All open source at the top level, no bundled binary artifacts.
 
 | Component | Version | SPDX license | Copyleft class | Commercial self-host verdict | Risk note |
 |-----------|--------:|--------------|----------------|------------------------------|-----------|
-| `opentelecrm` (root, private) | 0.1.0 | *(none declared — needs LICENSE)* | n/a | Safe once a license is declared | No top-level `LICENSE`/`package.json` `license` field in the root or workspace packages yet; add one (recommend MIT/Apache-2.0) before publishing |
-| `@opentelecrm/core-domain` (private) | 0.1.0 | *(none declared)* | n/a | Safe once declared | Same as above |
-| `@opentelecrm/db` (private) | 0.1.0 | *(none declared)* | n/a | Safe once declared | Same as above |
-| `@opentelecrm/api` (private) | 0.1.0 | *(none declared)* | n/a | Safe once declared | Same as above |
-| `@opentelecrm/mcp` (private) | 0.1.0 | *(none declared)* | n/a | Safe once declared | Same as above |
+| `opentelecrm` (root, private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Safe for self-host / FOSS distribution; obligations apply if you offer it as a network service (see AGPL §13) | `LICENSE` at repo root (AGPL-3.0 text) + `license` field declared in all 11 workspace package.json files |
+| `@opentelecrm/core-domain` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/db` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/api` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/mcp` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/contracts` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/rule-engine` (private) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/api` web dep (`apps/web`) | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
+| `@opentelecrm/whatsapp` / `whatsapp-bridge` / `telephony` | 0.1.0 | AGPL-3.0 | strong (copyleft) | Same as root | `license` field set |
 
-> Action item: add a `LICENSE` file and a `license` field to the root and every
-> workspace `package.json`. The recommend default for OpenTeleCRM is MIT. Until
-> that exists, the "release" it out-grows is technically unlicensed.
+> **License decision (2026-08-06):** OpenTeleCRM is **AGPL-3.0** — the root
+> `LICENSE` file carries the full AGPL-3.0 text and every workspace
+> `package.json` declares `"license": "AGPL-3.0"`. This matches the README's
+> long-standing claim and is the standard choice for a 1:1 FOSS clone of a
+> commercial SaaS. Earlier drafts of this file recommended MIT; that
+> recommendation is superseded by the decision to ship AGPL-3.0.
 
 ---
 
 ## 2. JS / TS runtime & tooling dependencies
 
-Deduped union of `dependencies` + `devDependencies` across all five `package.json`
+Deduped union of `dependencies` + `devDependencies` across all eleven `package.json`
 files. Verdict applies to OpenTeleCRM as a self-hosted commercial SaaS.)
 
 | Component | Version (repo) | SPDX license | Copyleft class | Commercial self-host verdict | Risk note |
@@ -121,8 +128,31 @@ review. All five are called out for action.
 | **n8n** | Sustainable Use License | non-commercial | Source-available, not OSI; explicitly restricts commercial multi-tenant use of the software itself | Not a hard dependency — drop it from the plan; build automation UI with **Temporal** (MIT) + an internal UI instead |
 | **Coqui XTTS** | Coqui Public Model License (non-commercial) | non-commercial | Model weights are restricted to non-commercial use; cannot ship the XTTS model in a commercial product | **Piper (MIT)** for TTS in the `ai` service. (faster-whisper, the ASR half, is already MIT) |
 
-**Bottom line:** the committed JS tree is 100 % permissive and safe. The planned
-infra stack is largely permissive (Postgres, Valkey, ClickHouse, NATS, Temporal,
+---
+
+## 5. Android / mobile dependencies (`apps/mobile`)
+
+Kotlin-native client shipped M0–M5 (2026-08-06). Gradle/AGP resolve versions;
+all direct tooling and libraries below are permissive (Apache-2.0 / MIT / BSD),
+so the APK carries no copyleft obligations beyond the app's own AGPL-3.0.
+
+| Component | Version | SPDX license | Copyleft class | Risk note |
+|-----------|--------:|--------------|----------------|-----------|
+| Kotlin (kotlinx-serialization) | 2.0.21 | Apache-2.0 | permissive | — |
+| Android Gradle Plugin (AGP) | 8.7.3 | Apache-2.0 | permissive | — |
+| Jetpack Compose BOM | 2024.12.01 | Apache-2.0 | permissive | — |
+| Hilt (Dagger) | 2.x | Apache-2.0 | permissive | — |
+| Room | 2.x | Apache-2.0 | permissive | — |
+| WorkManager | 2.x | Apache-2.0 | permissive | — |
+| Retrofit + OkHttp | 2.9/4.x | Apache-2.0 | permissive | — |
+| UnifiedPush | 3.0.10 | Apache-2.0 | permissive | — |
+
+---
+
+**Bottom line:** the committed JS tree is permissive (MIT/Apache-2.0), the
+Android tree is permissive, and OpenTeleCRM itself is **AGPL-3.0** (declared in
+the root `LICENSE` + every `package.json`). The planned infra stack is largely
+permissive (Postgres, Valkey, ClickHouse, NATS, Temporal,
 Zitadel, OpenFGA, Caddy, Prometheus, Meilisearch, GlitchTip, Uptime Kuma,
 Baileys, faster-whisper, Piper, LiveKit, Jitsi, Hyperswitch). The places to act
 before launch:
@@ -133,7 +163,7 @@ before launch:
 2. **Constrain**: Grafana (AGPL) and Loki (AGPL) are fine for internal
    ops/telemetry surfaces but must not be exposed to end customers as a
    managed feature.
-3. **Declare**: add a `LICENSE` + `license` field to the root and all workspace
-   `package.json` files (recommend MIT).
+3. **Declared**: AGPL-3.0 (root `LICENSE` + all 11 `package.json` `license`
+   fields) — done 2026-08-06.
 4. **Re-verify on adoption**: infra target versions are series-level; re-read
    each project's `LICENSE` when pinning exact releases.

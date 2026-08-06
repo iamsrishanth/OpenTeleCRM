@@ -4,13 +4,14 @@
 
 | Surface | Status | Details |
 |---------|--------|---------|
-| REST API | ✅ 97/97 tests | NestJS + Fastify, /autoupdate/v2, port 3005 |
+| REST API | ✅ 103/103 tests | NestJS + Fastify, /autoupdate/v2, port 3005 |
 | JSON-RPC MCP | ✅ 15/15 tests · 13 tools | Streamable HTTP, port 3100 (dev) |
-| Web app | ✅ built | Next.js agent desk + admin console, port 3007 |
+| Web app | ✅ built | Next.js agent desk + admin console, port 3000 |
 | WhatsApp | ✅ 22/22 tests · live | Standalone deploy-anywhere bridge (Baileys 7.x), port 3098 |
 | Telephony | ✅ 11/11 + live ARI | Dialer + callbacks, live Asterisk ARI wiring (native build) |
-| Automation | ✅ 97/97 incl. quota | Rules engine, scheduler, distribution, webhook, quota metering |
-| Bruno collection | ✅ 27 reqs, 58 assertions | TeleCRM wire-compatible |
+| Automation | ✅ 103/103 incl. quota | Rules engine, scheduler, distribution, webhook, quota metering, sequences |
+| Mobile app | ✅ M0–M5 shipped | Kotlin native (Compose), offline-first, F-Droid metadata |
+| Bruno collection | ✅ 27 reqs, 26 assertions | TeleCRM wire-compatible |
 
 ---
 
@@ -18,8 +19,8 @@
 
 ```bash
 make setup      # provision deps + install + db-init + db-migrate + db-seed
-make dev        # API on :3005 (web desk: pnpm --filter @opentelecrm/web dev → :3007)
-pnpm test       # 97 API + 15 MCP + 22 whatsapp + 11 telephony tests
+make dev        # API on :3005 (web desk: pnpm --filter @opentelecrm/web dev → :3000)
+pnpm test       # 103 API + 15 MCP + 22 whatsapp + 11 telephony tests
 ```
 
 Or step by step:
@@ -37,7 +38,7 @@ make db-seed           # demo enterprise, 5000 leads, 3 users, 2 pipelines
 ```bash
 cd collections/opentelecrm
 bash ../../scripts/bruno-bootstrap-jwt.sh   # inject a dev JWT
-npx @usebruno/cli run --env local -r .       # 27 requests, 58 assertions
+npx @usebruno/cli run --env local -r .       # 27 requests, 26 assertions
 ```
 
 ---
@@ -98,24 +99,42 @@ opentelecrm/
 │   ├── mcp/              # JSON-RPC MCP     (:3100 dev)
 │   ├── whatsapp/         # WhatsApp drivers (mock / wwebjs / baileys / bridge)
 │   ├── whatsapp-bridge/  # STANDALONE deploy-anywhere bridge (Baileys 7.x, :3098)
-│   └── telephony/        # Dialer scoring + Asterisk ARI provider
+│   ├── telephony/        # Dialer scoring + Asterisk ARI provider (live)
+│   ├── ai/               # (empty scaffold — P7 AI & voice)
+│   ├── analytics/        # (empty scaffold — P6 reports)
+│   ├── automation/       # (empty scaffold — ADR-0007 Temporal worker home)
+│   ├── ingest/           # (empty scaffold — P5 lead capture)
+│   ├── notifier/         # (empty scaffold — notifications)
+│   └── voice-agent/      # (empty scaffold — P7 voice)
 ├── packages/
 │   ├── db/               # Drizzle schema, RLS, migrations, seed data
 │   ├── contracts/        # Shared wire types (WhatsApp/Telephony/Automation)
-│   └── rule-engine/      # Pure-TS automation evaluator
+│   ├── core-domain/      # Domain types mirroring TeleCRM's model
+│   ├── rule-engine/      # Pure-TS automation evaluator
+│   ├── connectors/       # (empty scaffold — P5 capture connectors)
+│   ├── i18n/             # (empty scaffold)
+│   ├── phone/            # (empty scaffold)
+│   ├── sdk-ts/           # (empty scaffold)
+│   ├── testing/          # (empty scaffold)
+│   └── ui/               # (empty scaffold)
 ├── apps/
-│   ├── web/              # Next.js agent desk (dashboard, leads, inbox, dialer,
-│   │                     #   automations + visual builder, sequences, webhooks,
-│   │                     #   broadcasts, templates, callbacks, settings)
-│   ├── widget/           # Embeddable widget (placeholder)
-│   ├── extension/        # Browser extension (placeholder)
-│   └── mobile/           # Mobile app (placeholder — not started)
+│   ├── web/              # Next.js agent desk (:3000)
+│   ├── mobile/           # Kotlin native Android app (Compose, offline-first)
+│   ├── docs/             # (empty scaffold — help center)
+│   ├── extension/        # (empty scaffold — A1.4 click-to-call)
+│   └── widget/           # (empty scaffold — A2.7 website widget)
 ├── infra/
 │   ├── asterisk/         # Native Asterisk provision (source build on Debian 13)
-│   └── whatsapp-bridge/  # systemd unit for the standalone bridge
+│   ├── whatsapp-bridge/  # systemd unit for the standalone bridge
+│   ├── ansible/          # (empty scaffold — fleet-grade path)
+│   ├── helm/             # (empty scaffold)
+│   ├── native/           # (empty scaffold — binary installers)
+│   ├── observability/    # (empty scaffold — metrics/logs)
+│   └── terraform/        # (empty scaffold)
 ├── collections/          # Bruno API test collection
-├── docs/                 # ARCHITECTURE.md, PARITY.md, ADRs, PLAN-P4.md
-└── scripts/              # provision/, db/, bruno helpers
+├── fdroid/               # F-Droid metadata (com.opentelecrm.app)
+├── docs/                 # ARCHITECTURE.md, PARITY.md, ROADMAP.md, ADRs, phase records
+└── scripts/              # provision/, db/, tunnel, bruno helpers
 ```
 
 ### Live provider wiring (operator env)
@@ -138,7 +157,9 @@ opentelecrm/
 
 1. **Dev JWT** — HS256 signed with `DEV_JWT_SECRET`, used in local dev + Bruno
 2. **API tokens** — `telekrm_async_` / `telekrm_sync_` tokens, stored as SHA-256 hash
-3. **OIDC** — Zitadel id-tokens (future)
+3. **Enterprise-secret exchange** — `POST /auth/exchange` mints a sync token from the
+   seeded demo secret (mobile onboarding path, migration 0007)
+4. **OIDC** — Zitadel id-tokens (future)
 
 All requests route through `AuthGuard` + RLS via `withTenant(eid)` — no row can leak across tenants.
 
@@ -153,23 +174,24 @@ All requests route through `AuthGuard` + RLS via `withTenant(eid)` — no row ca
 | API token management | ✅ |
 | Team member list | ✅ |
 | Custom actions | ✅ |
-| WhatsApp (send, conversations, templates, broadcasts) | ✅ — live outbound via standalone bridge |
+| WhatsApp (send, conversations, templates, broadcasts, sequences) | ✅ — live outbound via standalone bridge |
 | Telephony (calls, dialer, callbacks, recordings) | ✅ — live Asterisk ARI dialing |
 | Automation (rules, schedule, distribution, webhook, quota) | ✅ |
 | Web app | ✅ — full agent desk + admin console |
-| Widget / extension / mobile | 🚧 — placeholders, not started |
+| Mobile app | ✅ — Kotlin native client (M0–M5) |
+| Widget / extension / docs | 🚧 — empty scaffolds, not started |
 
-Full detail: [docs/PARITY.md](./docs/PARITY.md)
+Full detail: [docs/PARITY.md](./docs/PARITY.md) · Roadmap: [docs/ROADMAP.md](./docs/ROADMAP.md)
 
 ---
 
 ## Test surface
 
 ```bash
-pnpm test              # all workspace tests (97 API + 15 MCP + 22 whatsapp + 11 telephony)
-cd services/api && npx vitest run --config vitest.contract.config.ts  # focused: 97 tests, 12 files
+pnpm test              # all workspace tests (103 API + 15 MCP + 22 whatsapp + 11 telephony)
+cd services/api && npx vitest run --config vitest.contract.config.ts  # focused: 103 tests, 13 files
 make typecheck         # tsc --noEmit across all workspaces
-pnpm lint              # Biome
+pnpm lint              # Biome (services + packages; apps/web uses eslint)
 ```
 
 Tests spin up the real API (dev JWT + seeded DB), hit `authGuard` + RLS — no mocking.
@@ -181,17 +203,18 @@ Tests spin up the real API (dev JWT + seeded DB), hit `authGuard` + RLS — no m
 - **Runtime** — Node.js ≥ 22, ESM
 - **Package management** — pnpm + Turborepo
 - **API** — NestJS 10 + Fastify adapter
-- **DB** — PostgreSQL 17, Drizzle ORM + Drizzle Kit, native RLS
+- **DB** — PostgreSQL 16 (provisioner) / 17 (host), Drizzle ORM + Drizzle Kit, native RLS
 - **Auth** — HS256 JWTs + SHA-256 API tokens + Zitadel OIDC (future)
 - **Deps** — TypeScript 5.7, Biome, Vitest
 - **WhatsApp** — standalone Baileys 7.x bridge (deploy-anywhere) + drivers
 - **Telephony** — native Asterisk 21 LTS + ARI (source-built on Debian 13)
+- **Mobile** — Kotlin 2.0, Compose, Room, WorkManager, UnifiedPush (see `apps/mobile/README.md`)
 - **Infra** — Native Debian 13, systemd units, no Docker
 
 ---
 
 ## License
 
-AGPL-3.0 — see [docs/LICENSES.md](./docs/LICENSES.md).
+AGPL-3.0 — see [LICENSE](./LICENSE) and [docs/LICENSES.md](./docs/LICENSES.md).
 
 This is not affiliated with TeleCRM. It is an independent, clean-room implementation of the documented API surface for self-hosted use.

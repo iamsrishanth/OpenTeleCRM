@@ -1,5 +1,8 @@
 # Phase 3 Execution Plan — Telephony (P3)
 
+> **Historical record.** This phase is shipped (and P4b added live Asterisk ARI
+> dialing). Current state + what's next: see [ROADMAP.md](./ROADMAP.md).
+
 Status: shipped (vertical slice) | Effort: think-hard | Owner: telephony wave | Applies after P2 (committed `7b98961`)
 
 ## Goal

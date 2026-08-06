@@ -1,5 +1,8 @@
 # Phase 1 Execution Plan — Core CRM (P1)
 
+> **Historical record.** This phase is shipped. Current state + what's next:
+> see [ROADMAP.md](./ROADMAP.md).
+
 Status: plan | Effort: think-hard | Owner: Bulma ⚡ / Shikamaru ♟️ | Applies after P0 (committed at e6547b7)
 
 ## Goal

@@ -23,21 +23,22 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 | [ADR-0012](#adr-0012-authorization-openfga--postgres-rls) | Authorization: OpenFGA + Postgres RLS | Accepted (RLS implemented) |
 | [ADR-0013](#adr-0013-reverse-proxy-caddy) | Reverse proxy: Caddy | Accepted (planned) |
 | [ADR-0014](#adr-0014-feature-flags-unleash-all-on-by-default) | Feature flags: Unleash, all-on by default | Accepted (planned) |
-| [ADR-0015](#adr-0015-whatsapp-whatsapp-webjs--cloud-api-driver) | WhatsApp: whatsapp-web.js + Cloud API driver | Accepted (planned) |
+| [ADR-0015](#adr-0015-whatsapp-whatsapp-webjs--cloud-api-driver) | WhatsApp: whatsapp-web.js + Cloud API driver | Accepted (implemented — Baileys/bridge operator path, see status update) |
 | [ADR-0016](#adr-0016-speech-to-text-faster-whisper--pyannote) | Speech-to-text: faster-whisper + pyannote | Accepted (planned) |
 | [ADR-0017](#adr-0017-voice-agent-livekit) | Voice agent: LiveKit | Accepted (planned) |
 | [ADR-0018](#adr-0018-text-to-speech-piper--coqui-xtts-opt-in) | Text-to-speech: Piper (Coqui XTTS opt-in) | Accepted (planned) |
-| [ADR-0019](#adr-0019-workflow-builder-react-flow) | Workflow builder: React Flow | Accepted (planned) |
+| [ADR-0019](#adr-0019-workflow-builder-react-flow) | Workflow builder: React Flow | Accepted (implemented) |
 | [ADR-0020](#adr-0020-etl-node-red-optional-n8n-excluded) | ETL: Node-RED optional (n8n excluded) | Accepted (planned) |
 | [ADR-0021](#adr-0021-bi-echarts-metabase-excluded) | BI: ECharts (Metabase excluded) | Accepted (planned) |
 | [ADR-0022](#adr-0022-payments-hyperswitch) | Payments: Hyperswitch | Accepted (planned) |
-| [ADR-0023](#adr-0023-web-nextjs-15--react-19--shadcnui) | Web: Next.js 16 + React 19 + shadcn/ui | Accepted (planned) |
-| [ADR-0024](#adr-0024-mobile-react-native--watermelondb--ntfy) | Mobile: React Native + WatermelonDB + ntfy | Accepted (planned) |
+| [ADR-0023](#adr-0023-web-nextjs-15--react-19--shadcnui) | Web: Next.js 16 + React 19 + shadcn/ui | Accepted (implemented) |
+| [ADR-0024](#adr-0024-mobile-react-native--watermelondb--ntfy) | Mobile: React Native + WatermelonDB + ntfy | Superseded (ADR-0030) |
 | [ADR-0025](#adr-0025-dev-auth-dev-jwt-secret--zitadel-in-prod) | Dev auth: `DEV_JWT_SECRET`, Zitadel in prod | Accepted (implemented) |
-| [ADR-0026](#adr-0026-telephony-asterisk--ari) | Telephony: Asterisk + ARI (chan_pjsip, Stasis `opentelecrm`) | Accepted (partial: provider scaffold + PBX config) |
+| [ADR-0026](#adr-0026-telephony-asterisk--ari) | Telephony: Asterisk + ARI (chan_pjsip, Stasis `opentelecrm`) | Accepted (implemented — live ARI dialing + Stasis bridge) |
 | [ADR-0027](#adr-0027-dialer-queue-scoring-pure-function) | Dialer queue scoring: pure function, weights documented | Accepted (implemented) |
 | [ADR-0028](#adr-0028-call-recording-storage-object-storage--signed-urls) | Call recording storage: object storage + signed URLs | Accepted (partial: metadata + signed URLs) |
 | [ADR-0029](#adr-0029-trai-calling-window-0900-2100) | TRAI calling window: 09:00–21:00, enforced in dialer | Accepted (implemented) |
+| [ADR-0030](#adr-0030-mobile-kotlin-native--compose--room) | Mobile: Kotlin native + Compose + Room (supersedes ADR-0024) | Accepted (implemented) |
 
 ---
 
@@ -317,7 +318,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ## ADR-0015: WhatsApp: whatsapp-web.js + Cloud API driver
 
-**Status:** Accepted (planned).
+**Status:** Accepted (implemented — with a driver-set revision, see status update below).
 
 **Context:** TeleCRM's core channel is WhatsApp messaging. Options for self-hosted WhatsApp integration: unofficial libraries (whatsapp-web.js) vs a gateway (WAHA) vs Meta's official Cloud API. This carries real ToS/ban risk — see RISKS.md.
 
@@ -335,6 +336,8 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 - − Unofficial driver can break without notice (WhatsApp protocol changes); must be pinned and monitored.
 - − Meta Cloud API requires phone-number verification and a Meta business setup — deployment prerequisite documented in infra.
 - − Legal posture is operator's responsibility; OpenTeleCRM ships the consent machinery but cannot indemnify.
+
+**Status update (2026-08, P4b):** the operator path is now **Baileys 7.x** (WebSocket driver) — it pairs business/smba numbers that whatsapp-web.js cannot (401s) and ships as a **standalone deploy-anywhere bridge** (`services/whatsapp-bridge`: own session, own inbound queue, HTTP API) plus the in-process `baileys` driver behind `WHATSAPP_DRIVER=bridge|baileys`. whatsapp-web.js remains a dev/fallback driver (`wwebjs`), and the Meta Cloud API remains the compliance-first production option (A2.3) — not yet wired. The dual-driver architecture and per-enterprise consent model stand; only the "default driver" recommendation changed (Baileys/bridge for self-hosted operators today).
 
 ---
 
@@ -398,7 +401,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ## ADR-0019: Workflow builder: React Flow
 
-**Status:** Accepted (planned).
+**Status:** Accepted (implemented — `apps/web/automations/builder`).
 
 **Context:** TeleCRM-parity automation UX (and the admin surface for Temporal workflows, ADR-0007) needs a visual builder: nodes for triggers/conditions/actions, edges for control flow, rendered in the web app.
 
@@ -470,7 +473,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ## ADR-0023: Web: Next.js 16 + React 19 + shadcn/ui
 
-**Status:** Accepted (planned — `apps/web` scaffold exists).
+**Status:** Accepted (implemented).
 
 **Context:** The agent/desk web app (leads grid, call pad, dashboards, workflow builder) must match TeleCRM's UX density with a modern, maintainable stack, and share UI primitives with the monorepo.
 
@@ -489,7 +492,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 
 ## ADR-0024: Mobile: React Native + WatermelonDB + ntfy
 
-**Status:** Accepted (planned — `apps/mobile` scaffold exists).
+**Status:** Superseded — see ADR-0030 (Kotlin native).
 
 **Context:** Field agents need the CRM on Android (telecalling app with call recording, lead updates, WhatsApp deep links). Offline resilience matters on bad networks; push must work without Google Play Services dependency (air-gap/India deployments).
 
@@ -624,4 +627,51 @@ Window resolution uses `Intl.DateTimeFormat` — no TZ-database dependency. Broa
 
 ---
 
-*Note: services/ai, services/analytics, services/automation, services/ingest, services/notifier, services/voice-agent and packages/connectors, i18n, phone, rule-engine, sdk-ts, testing, ui are scaffold directories — their ADRs land as the A1–A8 build waves execute. Telephony and contracts now carry theirs: ADR-0026–0029 (telephony) and ADR-0015 (WhatsApp provider surface). See RISKS.md for build-surface risk.*
+*Note: services/ai, services/analytics, services/automation, services/ingest, services/notifier, services/voice-agent and packages/connectors, i18n, phone, sdk-ts, testing, ui are scaffold directories — their ADRs land as the A1–A8 build waves execute. Implemented: ADR-0015 (WhatsApp provider surface, revised), ADR-0019 (React Flow builder), ADR-0026–0029 (telephony), ADR-0030 (mobile). See RISKS.md for build-surface risk.*
+
+---
+
+## ADR-0030: Mobile: Kotlin native + Compose + Room
+
+**Status:** Accepted (implemented — M0–M5, `apps/mobile`).
+
+**Context:** ADR-0024 chose React Native + WatermelonDB + ntfy for the mobile
+agent app. When the mobile phase executed (P8, ahead of the roadmap), the
+delivery wave chose a **native Kotlin** implementation instead. Rationale, as
+recorded in the build wave:
+
+- Caller-ID + in-call overlays and call-state polling need deep telephony
+  integration (`READ_PHONE_STATE`, `CallForegroundService`, `phoneCall` FGS)
+  that is cleaner and less bridge-dependent in native code.
+- Offline-first with Room + WorkManager maps directly onto the existing
+  Postgres/Drizzle domain model (typed DAOs, outbox pattern), without a sync
+  engine layer (WatermelonDB) in the middle.
+- Push: **UnifiedPush** (3.0.10) with an FCM adapter path — same
+  no-Google-dependency goal as ADR-0024's ntfy, with a broader ecosystem.
+- Kotlin 2.0 + Compose (BOM 2024.12.01) + Hilt keeps the TS monorepo's
+  type-safety discipline in a JVM-typed client; AGP 8.7.3.
+
+**Decision:** `apps/mobile` is a Kotlin-native Android app, 12 Gradle modules:
+`:app` + `core/{auth, database, designsystem, model, network, sync}` +
+`feature/{auth, dialer, inbox, leads, settings}`. Compose Material 3, Hilt DI,
+Room offline cache + action outbox, WorkManager flush worker, UnifiedPush
+receiver, `opentelecrm://` deep links, configurable API base URL
+(`ServerUrlStore` + onboarding), Keystore session. Release builds: R8 minify
+(APK 2.0MB), signing via gitignored `release.keystore` + `keystore.properties`,
+F-Droid metadata in `fdroid/`. ADR-0024 is superseded.
+
+**Alternatives:** React Native + WatermelonDB (ADR-0024 — superseded, see
+Context); Flutter (Dart split from TS monorepo — rejected); PWA (insufficient
+telephony/FGS integration — rejected).
+
+**Consequences:**
+
+- + Native telephony integration (caller-ID heads-up, call state, FGS) works
+  without bridge code.
+- + Room + WorkManager outbox is a proven offline-first pattern; verified
+  on-device through M0–M5 (leads sync, actions, dialer dispositions, inbox).
+- − Two client codebases (TS web + Kotlin mobile) instead of one JS stack —
+  shared API contracts mitigate drift.
+- − Android-only for now; iOS would be a separate native app (no RN bridge to
+  reuse).
+- − F-Droid ready; Play publishing is a release decision (internal track ready).

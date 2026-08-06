@@ -3,8 +3,10 @@
 Pure-TS rule evaluator for the **P4 automation layer** (A2.5 chatbot, A2.8
 drip/sequences, A4 automation — see `docs/PARITY.md`).
 
-No I/O. No DB. No provider references. The automation service in
-`services/automation` is the only thing that should import this package.
+No I/O. No DB. No provider references. The automation module in
+`services/api/src/automation/` is the only thing that should import this package
+(the `services/automation` directory is the planned Temporal worker home for
+durable automation — ADR-0007 — and will consume the same evaluator).
 
 ## Surface
 

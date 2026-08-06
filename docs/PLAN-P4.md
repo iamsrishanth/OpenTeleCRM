@@ -1,5 +1,9 @@
 # Phase 4 Execution Plan — Automation (P4)
 
+> **Historical record.** This phase is shipped (P4b wave completed: quota
+> metering, live Asterisk/WhatsApp wiring, sequences, React Flow builder).
+> Current state + what's next: see [ROADMAP.md](./ROADMAP.md).
+
 Status: shipped (API-level) | Effort: ultrathink | Owner: automation wave | Applies after P3 (committed `7b98961`)
 
 ## Goal

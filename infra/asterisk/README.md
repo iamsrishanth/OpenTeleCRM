@@ -6,8 +6,10 @@ The API service (`services/api`, NestJS) bridges to Asterisk over **ARI**
 (separate scaffold). This directory is the **PBX-side config only** — what
 runs on the Asterisk host.
 
-**No Docker anywhere** (user directive, ADR-0001). Asterisk installs natively
-via apt and runs under systemd.
+**No Docker anywhere** (user directive, ADR-0001). Debian 13 (trixie) ships
+**no asterisk binary package** (only asterisk-core-sounds-*), so Asterisk 21 LTS
+is built **from source** by `provision/build-asterisk-source.sh` (bundled
+pjproject; installs to `/usr/sbin/asterisk`) and runs under systemd.
 
 ## Architecture / API contract
 
@@ -48,9 +50,10 @@ The API can dial channels (`POST /ari/channels`), start/stop recordings
 > `modules.conf` (explicit `load =>` lines are added by the provision script).
 >
 > Version note: these templates target the **Asterisk 21 LTS** baseline.
-> Debian 13 (trixie) ships a newer LTS (22.x) via apt — that is fine: the
-> ARI/PJSIP/Stasis config syntax is stable across the 20–22 LTS lines and
-> every file here is version-agnostic.
+> Debian 13 (trixie) has no asterisk apt package, so the repo source-builds
+> 21 LTS via `provision/build-asterisk-source.sh`. The ARI/PJSIP/Stasis config
+> syntax is stable across the 20–22 LTS lines and every file here is
+> version-agnostic.
 
 ### 1. Install Asterisk
 
