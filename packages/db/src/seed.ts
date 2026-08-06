@@ -7,6 +7,7 @@
  *
  * Usage: pnpm --filter @opentelecrm/db seed
  */
+import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb, getPool, withTenant } from './index.js';
 import {
@@ -48,6 +49,21 @@ async function main() {
     .returning();
   if (!ent) throw new Error('enterprise insert returned no row');
   const eid = ent.id;
+
+  // Enterprise secret (M0 sync-token exchange). Only the sha256 hash + last-8
+  // tail are stored; the RAW secret is printed once below so the operator can
+  // copy it into the mobile app. DEMO_ENTERPRISE_SECRET makes it deterministic.
+  const secret =
+    process.env.DEMO_ENTERPRISE_SECRET && process.env.DEMO_ENTERPRISE_SECRET.length >= 8
+      ? process.env.DEMO_ENTERPRISE_SECRET
+      : `demo-secret-${randomUUID()}`;
+  const secretHash = createHash('sha256').update(secret).digest('hex');
+  const secretTail = secret.slice(-8);
+  await db
+    .update(enterprise)
+    .set({ secretHash, secretTail })
+    .where(eq(enterprise.id, eid))
+    .execute();
 
   // Everything below is tenant-scoped → run inside withTenant(eid) for RLS.
   await withTenant(eid, async (db) => {
@@ -343,6 +359,8 @@ async function main() {
   console.log(
     `\nSeeded enterprise: ${ent.name} (${eid}) | ${LEAD_COUNT} leads | ${PIPELINES.length} pipelines | ${CUSTOM_FIELDS} custom fields`,
   );
+  console.log(`Enterprise secret (copy into the mobile app): ${secret}`);
+  console.log(`  hash=${secretHash} tail=${secretTail}`);
   console.log('Users: owner@demo.local / admin@demo.local / agent@demo.local');
   await getPool().end();
 }

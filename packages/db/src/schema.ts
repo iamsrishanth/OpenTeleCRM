@@ -29,6 +29,10 @@ export const enterprise = pgTable('enterprise', {
   leadIdentifier: varchar('lead_identifier', { length: 64 }).default('phone').notNull(),
   timezone: varchar('timezone', { length: 64 }).default('Asia/Kolkata').notNull(),
   locale: varchar('locale', { length: 16 }).default('en-IN').notNull(),
+  // Enterprise secret for the sync-token exchange (M0): only the sha256 hash
+  // + last-8 tail are stored — the raw secret is shown once at seed time.
+  secretHash: text('secret_hash'),
+  secretTail: varchar('secret_tail', { length: 8 }),
   ...withTimestamps,
 });
 

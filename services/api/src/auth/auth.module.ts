@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AuthExchangeController } from './auth.exchange.controller.js';
 import { AuthGuard } from './auth.guard.js';
 import { TokenController } from './token.controller.js';
 import { TokenService } from './token.service.js';
@@ -15,7 +16,7 @@ import { TokenService } from './token.service.js';
  */
 @Global()
 @Module({
-  controllers: [TokenController],
+  controllers: [TokenController, AuthExchangeController],
   providers: [
     {
       provide: APP_GUARD,

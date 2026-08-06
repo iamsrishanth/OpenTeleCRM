@@ -10,8 +10,8 @@ type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => P
 
 /** `telekrm_{async|sync}_{uuid}` — TeleCRM-parity raw token prefix. */
 const TOKEN_PREFIX = 'telekrm_';
-/** Default API-token lifetime: 1 year. */
-const TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+/** Default API-token lifetime: 1 year. Exported so the exchange controller can surface expiresAt. */
+export const TOKEN_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 /**
  * Real API token service.

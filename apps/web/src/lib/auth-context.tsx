@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const segments = finalToken.split('.')
     if (segments.length !== 3) {
       // Otherwise exchange the enterprise secret for a sync token.
-      const res = await fetch(`${API_BASE}/enterprise/${eid.trim()}/api-tokens`, {
+      const res = await fetch(`${API_BASE}/enterprise/${eid.trim()}/auth/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secret: finalToken }),
@@ -70,7 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      const inner = (data.data ?? {}) as Record<string, unknown>
       finalToken =
+        (inner.rawToken as string) ??
+        (data.rawToken as string) ??
         (data.token as string) ??
         (data.apiToken as string) ??
         (data.syncToken as string) ??
