@@ -49,6 +49,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:auth"))
     implementation(project(":core:database"))
+    implementation(project(":core:sync"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:leads"))
     implementation(project(":feature:settings"))
@@ -64,6 +65,8 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.core.splashscreen)
 

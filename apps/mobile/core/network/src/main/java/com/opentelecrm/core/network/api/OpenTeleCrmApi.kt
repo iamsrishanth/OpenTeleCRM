@@ -1,5 +1,10 @@
 package com.opentelecrm.core.network.api
 
+import com.opentelecrm.core.model.ActionSearchRequest
+import com.opentelecrm.core.model.ActionSearchResponse
+import com.opentelecrm.core.model.CreateActionsRequest
+import com.opentelecrm.core.model.CreateActionsResponse
+import com.opentelecrm.core.model.CustomActionsResponse
 import com.opentelecrm.core.model.HealthResponse
 import com.opentelecrm.core.model.LeadSearchRequest
 import com.opentelecrm.core.model.LeadSearchResponse
@@ -51,6 +56,26 @@ interface OpenTeleCrmApi {
     /** GET /enterprise/{eid}/team-members — verified live shape {data:[...]}. */
     @GET("enterprise/{eid}/team-members")
     suspend fun teamMembers(@Path("eid") eid: String): TeamMembersResponse
+
+    /** POST /enterprise/{eid}/lead/{leadId}/action — batch, per-item statuses (M2). */
+    @POST("enterprise/{eid}/lead/{leadId}/action")
+    suspend fun createActions(
+        @Path("eid") eid: String,
+        @Path("leadId") leadId: String,
+        @Body body: CreateActionsRequest,
+    ): CreateActionsResponse
+
+    /** POST /enterprise/{eid}/lead/{leadId}/action/search — timeline (M2). */
+    @POST("enterprise/{eid}/lead/{leadId}/action/search")
+    suspend fun searchActions(
+        @Path("eid") eid: String,
+        @Path("leadId") leadId: String,
+        @Body body: ActionSearchRequest,
+    ): ActionSearchResponse
+
+    /** GET /enterprise/{eid}/custom-actions (M2). */
+    @GET("enterprise/{eid}/custom-actions")
+    suspend fun customActions(@Path("eid") eid: String): CustomActionsResponse
 }
 
 @Serializable

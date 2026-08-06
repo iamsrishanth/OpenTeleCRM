@@ -29,4 +29,10 @@ object DatabaseModule {
 
     @Provides
     fun provideLeadDao(db: AppDatabase): LeadDao = db.leadDao()
+
+    @Provides
+    fun provideActionDao(db: AppDatabase): ActionDao = db.actionDao()
+
+    @Provides
+    fun providePendingMutationDao(db: AppDatabase): PendingMutationDao = db.pendingMutationDao()
 }

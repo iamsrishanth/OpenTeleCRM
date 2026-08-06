@@ -142,3 +142,73 @@ data class TeamRole(
 data class TeamMembersResponse(
     val data: List<TeamMember> = emptyList(),
 )
+
+// --- Actions (M2) — verified Aug 2026 via live API ---
+
+/** GET/POST action/search item shape. */
+@Serializable
+data class ActionSummary(
+    val id: String,
+    val actionId: String? = null,
+    val leadId: String? = null,
+    val actionTypeId: String? = null,
+    val userId: String? = null,
+    val payload: JsonObject = JsonObject(emptyMap()),
+    val note: String? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class ActionSearchRequest(
+    val skip: Int = 0,
+    val limit: Int = 50,
+    val filters: List<LeadFilter> = emptyList(),
+)
+
+@Serializable
+data class ActionSearchResponse(
+    val data: List<ActionSummary> = emptyList(),
+    val total: Int = 0,
+)
+
+/** One item in POST /lead/{id}/action's batch — type is note|call|whatsapp|<customCode>. */
+@Serializable
+data class CreateActionItem(
+    val type: String,
+    val note: String? = null,
+    val payload: JsonObject? = null,
+)
+
+@Serializable
+data class CreateActionsRequest(
+    val actions: List<CreateActionItem>,
+)
+
+@Serializable
+data class ActionResultItem(
+    val actionId: String = "",
+    val id: String = "",
+    val typeId: String = "",
+    val status: String = "IGNORED",
+    val remarks: List<String> = emptyList(),
+)
+
+@Serializable
+data class CreateActionsResponse(
+    val data: List<ActionResultItem> = emptyList(),
+    val total: Int = 0,
+)
+
+/** GET /custom-actions item. */
+@Serializable
+data class CustomAction(
+    val code: String,
+    val name: String,
+    val isSystem: Boolean = false,
+    val fieldSchema: JsonObject = JsonObject(emptyMap()),
+)
+
+@Serializable
+data class CustomActionsResponse(
+    val data: List<CustomAction> = emptyList(),
+)

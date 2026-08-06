@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:auth"))
     implementation(project(":core:model"))
     implementation(project(":core:database"))
+    implementation(project(":core:sync"))
     implementation(project(":core:designsystem"))
 
     implementation(platform(libs.compose.bom))

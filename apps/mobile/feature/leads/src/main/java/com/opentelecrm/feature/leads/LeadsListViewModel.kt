@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.opentelecrm.core.auth.SessionManager
 import com.opentelecrm.core.model.LeadSummary
 import com.opentelecrm.core.model.TeamMember
+import com.opentelecrm.core.sync.ConnectivityObserver
+import com.opentelecrm.feature.leads.data.ActionsRepository
 import com.opentelecrm.feature.leads.data.LeadsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -22,6 +24,8 @@ import kotlinx.coroutines.launch
 class LeadsListViewModel @Inject constructor(
     private val repository: LeadsRepository,
     private val sessionManager: SessionManager,
+    private val connectivityObserver: ConnectivityObserver,
+    private val actionsRepository: ActionsRepository,
 ) : ViewModel() {
 
     data class LeadsUiState(
@@ -32,6 +36,8 @@ class LeadsListViewModel @Inject constructor(
         val error: String? = null,
         val syncedCount: Int? = null,
         val teamFilter: String? = null,
+        val isOnline: Boolean = true,
+        val pendingCount: Int = 0,
     )
 
     private val _uiState = MutableStateFlow(LeadsUiState())
@@ -45,6 +51,16 @@ class LeadsListViewModel @Inject constructor(
             repository.leads.collect { leads ->
                 allLeads.value = leads
                 publish()
+            }
+        }
+        viewModelScope.launch {
+            connectivityObserver.isOnline.collect { online ->
+                _uiState.update { it.copy(isOnline = online) }
+            }
+        }
+        viewModelScope.launch {
+            actionsRepository.pendingCount.collect { count ->
+                _uiState.update { it.copy(pendingCount = count) }
             }
         }
         refresh()
@@ -91,6 +107,14 @@ class LeadsListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Retries queued changes now — same path as a manual refresh. The outbox
+     * WorkManager worker also flushes automatically on reconnect.
+     */
+    fun retrySync() {
+        refresh()
     }
 
     /** Team members for the filter chips (suspend — screen loads them on first composition). */

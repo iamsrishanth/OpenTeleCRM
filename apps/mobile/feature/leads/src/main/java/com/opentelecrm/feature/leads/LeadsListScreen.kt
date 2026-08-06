@@ -83,6 +83,7 @@ fun LeadsRoute(
         onQueryChange = viewModel::onQueryChange,
         onTeamFilterChange = viewModel::setTeamFilter,
         onRefresh = viewModel::refresh,
+        onRetrySync = viewModel::retrySync,
         onLeadClick = onLeadClick,
         onOpenTeam = onOpenTeam,
         onOpenSettings = onOpenSettings,
@@ -97,6 +98,7 @@ private fun LeadsListScreen(
     onQueryChange: (String) -> Unit,
     onTeamFilterChange: (String?) -> Unit,
     onRefresh: () -> Unit,
+    onRetrySync: () -> Unit,
     onLeadClick: (String) -> Unit,
     onOpenTeam: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -147,6 +149,38 @@ private fun LeadsListScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
+            }
+
+            if (!uiState.isOnline) {
+                StatusBanner(
+                    message = "Offline — changes will sync when you reconnect",
+                    isError = false,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+
+            if (uiState.pendingCount > 0) {
+                // Compact outbox badge; WorkManager's worker also flushes on reconnect.
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${uiState.pendingCount} changes queued",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = onRetrySync) { Text("Sync now") }
+                    }
+                }
             }
 
             if (teamMembers != null && teamMembers.isNotEmpty()) {

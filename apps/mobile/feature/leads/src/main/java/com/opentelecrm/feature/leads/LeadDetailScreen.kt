@@ -1,5 +1,6 @@
 package com.opentelecrm.feature.leads
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,6 +28,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,18 +37,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.opentelecrm.core.designsystem.component.StatusBanner
+import com.opentelecrm.core.model.ActionSummary
 import com.opentelecrm.core.model.LeadSummary
 import kotlinx.serialization.json.JsonNull
 
 /**
- * M1 lead detail entry point. Wired in [com.opentelecrm.app.navigation.AppNavHost]
- * as `leads/{leadId}`.
+ * M2 lead detail entry point. Wired in [com.opentelecrm.app.navigation.AppNavHost]
+ * as `leads/{leadId}`. Shows the lead header/details/meta plus an activity
+ * timeline with a note/call/whatsapp composer.
  */
 @Composable
 fun LeadDetailRoute(
@@ -54,12 +65,16 @@ fun LeadDetailRoute(
 
     LaunchedEffect(leadId) {
         viewModel.load(leadId)
+        viewModel.refreshTimeline(leadId)
     }
 
     LeadDetailScreen(
         uiState = uiState,
         onBack = onBack,
         onRetry = { viewModel.load(leadId) },
+        onAddNote = { text -> viewModel.addNote(leadId, text) },
+        onLogCall = { viewModel.logCall(leadId) },
+        onLogWhatsApp = { viewModel.logWhatsApp(leadId) },
     )
 }
 
@@ -69,6 +84,9 @@ private fun LeadDetailScreen(
     uiState: LeadDetailUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onAddNote: (String) -> Unit,
+    onLogCall: () -> Unit,
+    onLogWhatsApp: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -105,6 +123,14 @@ private fun LeadDetailScreen(
                     LeadContent(
                         lead = uiState.lead,
                         ownerName = uiState.ownerName,
+                        timeline = uiState.timeline,
+                        timelineLoading = uiState.timelineLoading,
+                        actionError = uiState.actionError,
+                        composing = uiState.composing,
+                        pendingCount = uiState.pendingCount,
+                        onAddNote = onAddNote,
+                        onLogCall = onLogCall,
+                        onLogWhatsApp = onLogWhatsApp,
                     )
                 }
                 else -> {
@@ -122,6 +148,14 @@ private fun LeadDetailScreen(
 private fun LeadContent(
     lead: LeadSummary,
     ownerName: String?,
+    timeline: List<ActionSummary>,
+    timelineLoading: Boolean,
+    actionError: String?,
+    composing: Boolean,
+    pendingCount: Int,
+    onAddNote: (String) -> Unit,
+    onLogCall: () -> Unit,
+    onLogWhatsApp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -147,6 +181,120 @@ private fun LeadContent(
             )
             KeyValueRow(label = "Created", value = lead.createdAt ?: "—")
             KeyValueRow(label = "Updated", value = lead.updatedAt ?: "—")
+        }
+        SectionCard(title = "Activity") {
+            ActivityComposer(
+                composing = composing,
+                pendingCount = pendingCount,
+                onAddNote = onAddNote,
+                onLogCall = onLogCall,
+                onLogWhatsApp = onLogWhatsApp,
+            )
+            actionError?.let {
+                Spacer(Modifier.height(8.dp))
+                StatusBanner(message = it)
+            }
+            Spacer(Modifier.height(8.dp))
+            if (timeline.isEmpty()) {
+                if (timelineLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                } else {
+                    Text(
+                        text = "No activity yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                timeline.forEach { action -> TimelineRow(action) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityComposer(
+    composing: Boolean,
+    pendingCount: Int,
+    onAddNote: (String) -> Unit,
+    onLogCall: () -> Unit,
+    onLogWhatsApp: () -> Unit,
+) {
+    var noteText by rememberSaveable { mutableStateOf("") }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = noteText,
+            onValueChange = { noteText = it },
+            placeholder = { Text("Add a note…") },
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+        )
+        Button(
+            onClick = {
+                onAddNote(noteText)
+                noteText = ""
+            },
+            enabled = noteText.isNotBlank() && !composing,
+        ) {
+            Text("Add note")
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(onClick = onLogCall, enabled = !composing) {
+            Text("Log call")
+        }
+        OutlinedButton(onClick = onLogWhatsApp, enabled = !composing) {
+            Text("WhatsApp")
+        }
+        if (composing) {
+            Spacer(Modifier.width(4.dp))
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+        }
+    }
+    if (pendingCount > 0) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "$pendingCount action(s) pending sync",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun TimelineRow(action: ActionSummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(MaterialTheme.colorScheme.primary, CircleShape),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = action.note ?: action.actionTypeId ?: "Activity",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            action.createdAt?.let { created ->
+                Text(
+                    text = created,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
