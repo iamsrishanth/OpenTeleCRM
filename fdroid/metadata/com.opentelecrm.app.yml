@@ -1,0 +1,39 @@
+# F-Droid metadata (M5). Keep in sync with app/build.gradle.kts versionCode/Name.
+Categories:
+  - Contact
+License: AGPL-3.0-or-later
+AuthorName: OpenTeleCRM
+AuthorWebSite: https://github.com/iamsrishanth/OpenTeleCRM
+SourceCode: https://github.com/iamsrishanth/OpenTeleCRM
+IssueTracker: https://github.com/iamsrishanth/OpenTeleCRM/issues
+Changelog: https://github.com/iamsrishanth/OpenTeleCRM/releases
+
+AutoName: OpenTeleCRM
+Summary: Open-source TeleCRM mobile client
+Description: |
+  Android client for the self-hosted OpenTeleCRM backend. Leads sync with
+  offline outbox, WhatsApp inbox, click-to-dial with caller-ID, and UnifiedPush
+  alerts.
+
+RepoType: git
+Repo: https://github.com/iamsrishanth/OpenTeleCRM.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: apps/mobile
+    gradle:
+      - assembleRelease
+    gradleprops:
+      - keystore.properties=RELEASE_KEYSTORE_PROPERTIES
+
+AllowedAPKSigningKeys:
+  - 1168014512f6ee7e05230625cd96da21f8779d5ec40dcbf4cc5c7e2267893ba4
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+VercodeOperation:
+  - '%c'
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1

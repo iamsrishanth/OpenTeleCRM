@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.opentelecrm.app"
     compileSdk = 35
@@ -18,15 +20,31 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            val props = releaseSigningProps
+            if (props != null) {
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (releaseSigningProps != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -43,6 +61,17 @@ android {
         jvmTarget = "17"
     }
 }
+
+/**
+ * M5 release signing: reads ../keystore.properties (gitignored). Null when
+ * absent so CI/debug builds still configure cleanly (unsigned release).
+ */
+val releaseSigningProps: Properties?
+    get() {
+        val f = file("../keystore.properties")
+        if (!f.exists()) return null
+        return Properties().apply { f.inputStream().use { load(it) } }
+    }
 
 dependencies {
     implementation(project(":core:designsystem"))
@@ -72,6 +101,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     implementation(libs.core.splashscreen)
     implementation(libs.unifiedpush.connector)
+    implementation(libs.profileinstaller)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

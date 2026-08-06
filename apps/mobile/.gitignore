@@ -1,0 +1,4 @@
+
+# M5 release signing (never commit)
+keystore.properties
+release.keystore
