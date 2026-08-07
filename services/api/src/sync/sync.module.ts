@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { LeadsController } from './leads.controller.js';
+import { LeadsController, LeadsListController } from './leads.controller.js';
 import { ActionsController } from './actions.controller.js';
 
 /**
@@ -8,6 +8,6 @@ import { ActionsController } from './actions.controller.js';
  * providers list here is enough — no explicit import needed.
  */
 @Module({
-  controllers: [LeadsController, ActionsController],
+  controllers: [LeadsController, LeadsListController, ActionsController],
 })
 export class SyncModule {}

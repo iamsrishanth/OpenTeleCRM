@@ -12,6 +12,7 @@ import { getDb, withTenant, actionType } from '@opentelecrm/db';
 import { AppModule } from '../app.module.js';
 
 const ENTERPRISE_ID = process.env.TEST_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
+const OTHER_ENTERPRISE_ID = '9811c8f1-9051-4e65-9a3e-f321ed1e209b';
 // Build the env key dynamically so the value isn't inlined (redaction-safe).
 const ENV_KEY = 'DEV_' + 'JWT_' + 'SECRET';
 const SECRET = 'dev-' + 'secret-' + 'for-' + 'contract-' + 'tests';
@@ -124,6 +125,55 @@ describe('Sync POST /enterprise/:eid/lead', () => {
     expect(rejected).toBeTruthy();
     expect(rejected.status).toBe('REJECTED');
     expect(rejected.remarks).toContain('unknown field');
+  });
+});
+
+describe('Sync GET /enterprise/:eid/leads (web-desk list)', () => {
+  it('returns the paginated lead list shape { data, total }', async () => {
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/leads?limit=5`, {
+      headers: headers(),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+    expect(typeof body.total).toBe('number');
+    // Seeded demo workspace has ≥ 5,000 leads.
+    expect(body.total).toBeGreaterThanOrEqual(5000);
+  });
+
+  it('honors limit and skip', async () => {
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/leads?limit=2&skip=0`, {
+      headers: headers(),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.length).toBe(2);
+  });
+
+  it('exposes flat web-desk fields (name/phone/email) on each row', async () => {
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/leads?limit=5`, {
+      headers: headers(),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    for (const row of body.data) {
+      expect(row).toHaveProperty('id');
+      expect(row).toHaveProperty('identifier');
+      expect(row).toHaveProperty('customFields');
+      expect(row).toHaveProperty('name');
+      expect(row).toHaveProperty('phone');
+      expect(row).toHaveProperty('email');
+    }
+  });
+
+  it('scopes per tenant — a mismatched JWT cannot list another tenant', async () => {
+    const res = await fetch(`${base}/autoupdate/v2/enterprise/${ENTERPRISE_ID}/leads`, {
+      headers: {
+        authorization: `Bearer ${jwt.sign({ enterpriseId: OTHER_ENTERPRISE_ID, sub: 'x' }, SECRET, { expiresIn: '1h' })}`,
+      },
+    });
+    expect([401, 403, 500]).toContain(res.status);
   });
 });
 

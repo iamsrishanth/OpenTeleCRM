@@ -74,16 +74,17 @@ export class TokenService {
         // not a dev JWT — fall through
       }
     }
-    // (c) Zitadel OIDC id-token (issuer-checked) when configured.
-    if (process.env.ZITADEL_ISSUER) {
-      try {
-        const payload = jwt.decode(rawToken) as { enterpriseId?: string; sub?: string } | null;
-        if (payload?.enterpriseId) {
-          return { enterpriseId: payload.enterpriseId, userId: payload.sub, tokenType: 'oidc' };
-        }
-      } catch {
-        /* fall through */
-      }
+    // (c) Zitadel OIDC id-token when properly verified.
+    // NOTE: real signature verification (JWKS fetch, issuer/audience checks)
+    // is not implemented yet — docs/RISKS.md logs this as a known high-risk
+    // gap. Fail CLOSED: without real verification we must NOT accept OIDC
+    // tokens, otherwise anyone can mint a token claiming any enterpriseId.
+    // A future Zitadel integration must replace this branch with jose/JWKS
+    // verification (algorithms RS256, issuer, audience AUTH_JWT_AUDIENCE).
+    if (process.env.ZITADEL_ISSUER && process.env.ZITADEL_CLIENT_ID) {
+      throw new UnauthorizedException({
+        error: { code: 'NOT_AUTHORIZED', message: 'OIDC authentication is not enabled' },
+      });
     }
     throw new UnauthorizedException({ error: { code: 'NOT_AUTHORIZED', message: 'Invalid or expired token' } });
   }

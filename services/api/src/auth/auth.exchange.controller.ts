@@ -31,9 +31,25 @@ const UNAUTHORIZED_BODY = {
 
 // In-memory per-eid failure throttle (module-level: one map per app instance).
 // 5 consecutive failures → locked for 15 min; success resets the counter.
+// Bounded with a simple cap so an attacker flooding unique eid strings cannot
+// grow the map without limit (memory DoS).
 const MAX_FAILS = 5;
 const LOCK_MS = 15 * 60 * 1000;
+const MAX_FAIL_ENTRIES = 10_000;
 const failMap = new Map<string, { fails: number; lockedUntil: number }>();
+
+function pruneFailMap(): void {
+  if (failMap.size <= MAX_FAIL_ENTRIES) return;
+  // Evict oldest entries (Map preserves insertion order) — drop the first
+  // quarter of the overflow.
+  const overflow = failMap.size - MAX_FAIL_ENTRIES;
+  let removed = 0;
+  for (const key of failMap.keys()) {
+    if (removed >= overflow) break;
+    failMap.delete(key);
+    removed += 1;
+  }
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -72,6 +88,7 @@ export class AuthExchangeController {
   }
 
   private recordFail(eid: string): void {
+    pruneFailMap();
     const now = Date.now();
     const entry = failMap.get(eid) ?? { fails: 0, lockedUntil: 0 };
     entry.fails += 1;

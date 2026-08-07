@@ -25,8 +25,13 @@
  *   PAIR_ONLY              exit after pairing instead of serving (default false)
  *   ALLOWED_USERS          comma-separated numbers for inbound; empty = all
  *   MAX_QUEUE              inbound queue cap (default 1000)
+ *   BRIDGE_TOKEN           shared secret for /send /messages /typing (optional
+ *                          but strongly recommended when binding 0.0.0.0 —
+ *                          without it any host that can reach the port can
+ *                          send WhatsApp messages as this number)
  */
 import { createServer } from 'node:http'
+import { timingSafeEqual } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -40,6 +45,7 @@ import {
 import qrcode from 'qrcode-terminal'
 
 const PORT = Number(process.env.PORT ?? 3098)
+const BRIDGE_TOKEN = process.env.BRIDGE_TOKEN ?? ''
 const SESSION_DIR = process.env.SESSION_DIR ?? join(process.cwd(), '.data', 'bridge-session')
 const PAIRING_PHONE = (process.env.WHATSAPP_PAIRING_CODE ?? '').replace(/[^0-9]/g, '')
 const WAIT_FOR_LINK = (process.env.WAIT_FOR_LINK ?? 'true') !== 'false'
@@ -231,6 +237,14 @@ const server = createServer(async (req, res) => {
     return
   }
 
+  // Auth gate: when BRIDGE_TOKEN is configured, every non-health route
+  // requires `Authorization: Bearer <token>`. Without this any host that
+  // can reach the port could send WhatsApp messages as this number.
+  if (BRIDGE_TOKEN && !authorized(req)) {
+    sendJson(res, 401, { error: 'unauthorized' })
+    return
+  }
+
   if (req.method === 'POST' && path === '/send') {
     if (!sock || connectionState !== 'connected') {
       sendJson(res, 503, { error: 'Not connected to WhatsApp' })
@@ -289,6 +303,17 @@ function chunkText(text: string, max = 4096): string[] {
   const out: string[] = []
   for (let i = 0; i < text.length; i += max) out.push(text.slice(i, i + max))
   return out
+}
+
+/** Timing-safe check that the request carries the configured BRIDGE_TOKEN. */
+function authorized(req: { headers: Record<string, string | string[] | undefined> }): boolean {
+  const header = req.headers.authorization
+  if (typeof header !== 'string' || !header) return false
+  const [scheme, token] = header.split(' ')
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return false
+  const a = Buffer.from(token)
+  const b = Buffer.from(BRIDGE_TOKEN)
+  return a.length === b.length && timingSafeEqual(a, b)
 }
 
 function sleep(ms: number): Promise<void> {

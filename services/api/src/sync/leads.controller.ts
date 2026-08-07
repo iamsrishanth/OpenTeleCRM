@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpException, HttpStatus, Param, Post, Put, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpException, HttpStatus, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { and, count, desc, eq, sql, type SQL } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
@@ -23,6 +23,40 @@ const RESERVED = new Set([
   'tags',
   'customFields',
 ]);
+
+// Web-desk friendly standard fields: the web Lead type carries name/phone/email
+// at the top level. They are stored inside custom_fields (TeleCRM parity keeps
+// the wire shape) but accepted as top-level keys on create/update so the web
+// Add Lead dialog does not silently drop contact info.
+const STANDARD_CUSTOM_FIELDS = new Set(['name', 'phone', 'email']);
+
+function standardFieldValue(customFields: Record<string, unknown> | null, key: string): string | null {
+  const v = customFields?.[key];
+  return typeof v === 'string' && v ? v : null;
+}
+
+/** Lead wire shape — TeleCRM parity fields + web-desk flat name/phone/email. */
+function serializeLead(row: typeof lead.$inferSelect) {
+  return {
+    id: row.id,
+    identifier: row.identifier,
+    customFields: row.customFields,
+    // Web-desk friendly flat fields, derived from custom_fields so the web
+    // Lead type (name/phone/email at the top level) renders real values.
+    // `owner` is the seeded demo convention for the lead name.
+    name: standardFieldValue(row.customFields, 'name') ?? standardFieldValue(row.customFields, 'owner'),
+    phone: standardFieldValue(row.customFields, 'phone'),
+    email: standardFieldValue(row.customFields, 'email'),
+    source: row.source,
+    score: row.score,
+    tags: row.tags ?? [],
+    stageId: row.stageId,
+    pipelineId: row.pipelineId,
+    ownerUserId: row.ownerUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
 
 interface CreateLeadDto {
   identifier?: string;
@@ -155,19 +189,7 @@ export class LeadsController {
   }
 
   private serialize(row: typeof lead.$inferSelect) {
-    return {
-      id: row.id,
-      identifier: row.identifier,
-      customFields: row.customFields,
-      source: row.source,
-      score: row.score,
-      tags: row.tags ?? [],
-      stageId: row.stageId,
-      pipelineId: row.pipelineId,
-      ownerUserId: row.ownerUserId,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    };
+    return serializeLead(row);
   }
 
   @Post()
@@ -198,7 +220,7 @@ export class LeadsController {
       const fields: { apiName: string; status: string; remarks: string[] }[] = [];
       const cleanCustom: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(merged)) {
-        if (valid.has(k)) {
+        if (valid.has(k) || STANDARD_CUSTOM_FIELDS.has(k)) {
           fields.push({ apiName: k, status: 'ACCEPTED', remarks: [] });
           if (v !== undefined && v !== null) cleanCustom[k] = v;
         } else {
@@ -340,7 +362,7 @@ export class LeadsController {
       const fields: { apiName: string; status: string; remarks: string[] }[] = [];
       const cleanCustom: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(merged)) {
-        if (valid.has(k)) {
+        if (valid.has(k) || STANDARD_CUSTOM_FIELDS.has(k)) {
           fields.push({ apiName: k, status: 'ACCEPTED', remarks: [] });
           if (v !== undefined && v !== null) cleanCustom[k] = v;
         } else {
@@ -425,5 +447,59 @@ export class LeadsController {
 
   private genIdentifier(): string {
     return 'lead-' + crypto.randomUUID();
+  }
+}
+
+/**
+ * Web-desk leads list surface — `GET /enterprise/:eid/leads`.
+ *
+ * The web app (apps/web) has always called the plural `/leads?limit=N` route
+ * (dashboard recent activity, Leads page, callbacks/broadcasts lead pickers),
+ * but the API only ever exposed the TeleCRM-parity singular surface
+ * (`POST /enterprise/:eid/lead/search`). The 404 was silently swallowed by the
+ * web's catch block → "No leads yet" while the dashboard stats (from
+ * `/dashboard/stats`) correctly showed the real count.
+ *
+ * This route mirrors the existing list conventions (calls/callbacks): returns
+ * `{ data, total }`, ordered newest-first, tenant-scoped through withTenant.
+ */
+@Controller('enterprise/:eid/leads')
+export class LeadsListController {
+  constructor(
+    @Inject(DB_PROVIDER) private db: DbClient,
+    @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
+  ) {}
+
+  @Get()
+  async list(
+    @Param('eid') eid: string,
+    @Req() req: FastifyRequest,
+    @Query('skip') skip?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const auth = req.auth;
+    if (!auth) throw new Error('unauthenticated');
+    if (auth.enterpriseId !== eid) throw new Error('enterprise mismatch');
+
+    const skipN = Number(skip ?? 0);
+    const limitN = Math.min(Math.max(Number(limit ?? 50), 1), 100);
+
+    const { rows, total } = await this.withTenant(eid, async (db) => {
+      const [rows, totalRows] = await Promise.all([
+        db
+          .select()
+          .from(lead)
+          .where(eq(lead.enterpriseId, eid))
+          .orderBy(desc(lead.createdAt))
+          .limit(limitN)
+          .offset(skipN),
+        db.select({ c: count() }).from(lead).where(eq(lead.enterpriseId, eid)),
+      ]);
+      return { rows, total: totalRows[0]!.c };
+    });
+
+    const serialize = (row: typeof lead.$inferSelect) => serializeLead(row);
+
+    return { data: rows.map(serialize), total };
   }
 }

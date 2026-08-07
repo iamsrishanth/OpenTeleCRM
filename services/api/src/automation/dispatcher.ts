@@ -239,14 +239,15 @@ const EXECUTORS: Record<
       return { leadId: ctx.leadId, field: 'score', value: num };
     }
 
-    // Everything else merges into customFields jsonb.
+    // Everything else merges into customFields jsonb. Built with
+    // jsonb_build_object + Drizzle-bound params (apiName/value are never
+    // spliced into SQL — the old sql.raw string concat was injectable).
+    const jsonValue = JSON.stringify(value === undefined ? null : value);
     await disp.withTenant(ctx.enterpriseId, async (db) =>
       db
         .update(lead)
         .set({
-          customFields: sql`coalesce(${lead.customFields}, '{}'::jsonb) || ${sql.raw(
-            `'{"' || ${apiName} || '":' || ${JSON.stringify(value)} || '}'`,
-          )}::jsonb`,
+          customFields: sql`coalesce(${lead.customFields}, '{}'::jsonb) || jsonb_build_object(${apiName}, ${jsonValue}::jsonb)`,
         })
         .where(eq(lead.id, ctx.leadId!)),
     );

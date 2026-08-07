@@ -67,7 +67,18 @@ export class BridgeProvider implements WhatsAppProvider {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs)
     try {
-      return await fetch(`${this.bridgeUrl}${path}`, { ...init, signal: ctrl.signal })
+      const headers: Record<string, string> = {
+        ...(init?.headers as Record<string, string> | undefined),
+      }
+      // Authenticate against the bridge when a shared token is configured
+      // (services/whatsapp-bridge BRIDGE_TOKEN).
+      const token = process.env.WHATSAPP_BRIDGE_TOKEN
+      if (token) headers.authorization = `Bearer ${token}`
+      return await fetch(`${this.bridgeUrl}${path}`, {
+        ...init,
+        headers,
+        signal: ctrl.signal,
+      })
     } finally {
       clearTimeout(timer)
     }
