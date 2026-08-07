@@ -3,6 +3,9 @@ vars {
   apiPrefix: /autoupdate/v2
   enterpriseId: a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9
   authToken: Bearer <dev-jwt>
+  # Set to the DEV_JWT_SECRET value in your local .env (run
+  # scripts/bruno-bootstrap-jwt.sh to mint a fresh JWT into authToken).
+  devJwtSecret: <dev-jwt-secret>
   cryptoProbe: ERR:Cannot find module crypto
   callId: 574f746f-8c60-417b-ae0a-23323cb2f8a7
   dialerLeadId: f136f1ee-2d8a-49b3-a5eb-570be1daca78

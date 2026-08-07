@@ -13,7 +13,7 @@ get {
 script:pre-request {
   // Pure-JS JWT mint (HS256) — no require('crypto'), Bruno sandbox safe.
   // Mirrors 00-bootstrap/00-mint-token.bru so this folder runs standalone.
-  const secret = 'dev' + '-' + 'secret' + '-' + 'for' + '-' + 'local' + '-' + 'dev';
+    const secret = bru.getEnvVar('devJwtSecret');
   const enterpriseId = bru.getEnvVar('enterpriseId');
 
   const b64url = (input) => {

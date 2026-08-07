@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo '/mnt/data/Projects/ByteCodeCRM')"
 ENV_FILE="collections/opentelecrm/environments/local.bru"
 
-DEV_JWT_SECRET="${DEV_JWT_SECRET:-***REDACTED***}"
+DEV_JWT_SECRET="${DEV_JWT_SECRET:?set DEV_JWT_SECRET in .env or the shell}"
 ENTERPRISE_ID="a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9"
 
 JWT=$(NODE_PATH=services/api/node_modules node -e "

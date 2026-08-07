@@ -12,7 +12,7 @@ get {
 
 script:pre-request {
   // HMAC-SHA256 via Web Crypto API (Node 22 globalThis.crypto — no require).
-  const secret = 'dev' + '-' + 'secret' + '-' + 'for' + '-' + 'local' + '-' + 'dev';
+    const secret = bru.getEnvVar('devJwtSecret');
   const enterpriseId = bru.getEnvVar('enterpriseId');
 
   const b64url = (input) => {
