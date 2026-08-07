@@ -38,9 +38,15 @@ async function bootstrap() {
   });
 
   // First-class web client (apps/web) on a different origin in dev.
-  // TODO(security): replace origin:true with an explicit allowlist before
-  // any cookie-based auth is introduced (docs/RISKS.md).
-  app.enableCors({ origin: true, credentials: true });
+  // Explicit allowlist, NOT origin:true — origin:true reflects any origin
+  // with credentials, which is only safe while auth is Bearer-header based.
+  // CORS_ORIGINS is a comma-separated list; default covers the local web desk
+  // and the tunnel hostname used by `make tunnel`.
+  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3007,http://127.0.0.1:3007')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: corsOrigins, credentials: true });
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });

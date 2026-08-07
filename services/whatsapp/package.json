@@ -21,7 +21,7 @@
   "dependencies": {
     "@opentelecrm/contracts": "workspace:*",
     "@opentelecrm/db": "workspace:*",
-    "@whiskeysockets/baileys": "^6.7.0",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.4",
     "qrcode-terminal": "^0.12.0",

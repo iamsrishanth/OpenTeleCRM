@@ -8,9 +8,11 @@ import {
   Inject,
   Param,
   Post,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'node:crypto';
+import type { FastifyRequest } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { enterprise, type DbClient } from '@opentelecrm/db';
@@ -38,6 +40,16 @@ const LOCK_MS = 15 * 60 * 1000;
 const MAX_FAIL_ENTRIES = 10_000;
 const failMap = new Map<string, { fails: number; lockedUntil: number }>();
 
+// Per-IP failure throttle: complements the per-eid lock so an attacker
+// rotating eids from one host cannot do 5 attempts per eid across many eids.
+// Bounded identically to failMap. Keyed on the immediate peer (x-forwarded-for
+// first hop is untrusted when the API sits behind a proxy — Fastify's
+// req.ip is the socket peer, which is what we want here).
+const MAX_IP_FAILS = 20;
+const IP_LOCK_MS = 5 * 60 * 1000;
+const MAX_IP_ENTRIES = 10_000;
+const ipFailMap = new Map<string, { fails: number; lockedUntil: number }>();
+
 function pruneFailMap(): void {
   if (failMap.size <= MAX_FAIL_ENTRIES) return;
   // Evict oldest entries (Map preserves insertion order) — drop the first
@@ -49,6 +61,40 @@ function pruneFailMap(): void {
     failMap.delete(key);
     removed += 1;
   }
+}
+
+function pruneIpFailMap(): void {
+  if (ipFailMap.size <= MAX_IP_ENTRIES) return;
+  const overflow = ipFailMap.size - MAX_IP_ENTRIES;
+  let removed = 0;
+  for (const key of ipFailMap.keys()) {
+    if (removed >= overflow) break;
+    ipFailMap.delete(key);
+    removed += 1;
+  }
+}
+
+function ipLocked(ip: string): boolean {
+  const entry = ipFailMap.get(ip);
+  if (!entry) return false;
+  if (entry.lockedUntil > Date.now()) return true;
+  if (entry.lockedUntil > 0) ipFailMap.delete(ip);
+  return false;
+}
+
+function recordIpFail(ip: string): void {
+  pruneIpFailMap();
+  const now = Date.now();
+  const entry = ipFailMap.get(ip) ?? { fails: 0, lockedUntil: 0 };
+  entry.fails += 1;
+  if (entry.fails >= MAX_IP_FAILS) {
+    entry.lockedUntil = now + IP_LOCK_MS;
+  }
+  ipFailMap.set(ip, entry);
+}
+
+function resetIp(ip: string): void {
+  ipFailMap.delete(ip);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,7 +147,15 @@ export class AuthExchangeController {
   @Public()
   @HttpCode(200)
   @Post('auth/exchange')
-  async exchange(@Param('eid') eid: string, @Body() body: unknown) {
+  async exchange(@Param('eid') eid: string, @Req() req: FastifyRequest, @Body() body: unknown) {
+    // Per-IP throttle first: an attacker rotating eids from one host must not
+    // be able to make 5 attempts per eid across many eids. Uses the socket
+    // peer (req.ip) — NOT x-forwarded-for, which is client-controlled.
+    const ip = req.ip ?? 'unknown';
+    if (ipLocked(ip)) {
+      throw new HttpException({ error: { code: 'RATE_LIMITED' } }, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     // Locked eids short-circuit before any DB work.
     if (this.isLocked(eid)) {
       throw new HttpException({ error: { code: 'RATE_LIMITED' } }, HttpStatus.TOO_MANY_REQUESTS);
@@ -118,6 +172,7 @@ export class AuthExchangeController {
     // Non-UUID eid is indistinguishable from an unknown enterprise — same 401.
     if (!UUID_RE.test(eid)) {
       this.recordFail(eid);
+      recordIpFail(ip);
       throw new UnauthorizedException(UNAUTHORIZED_BODY);
     }
 
@@ -133,10 +188,12 @@ export class AuthExchangeController {
     const computed = createHash('sha256').update(secret).digest('hex');
     if (!row?.secretHash || !safeEqualHex(computed, row.secretHash)) {
       this.recordFail(eid);
+      recordIpFail(ip);
       throw new UnauthorizedException(UNAUTHORIZED_BODY);
     }
 
     this.reset(eid);
+    resetIp(ip);
     const { rawToken, tail } = await this.tokenService.issueToken(eid, 'sync', 'mobile-app');
     const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 

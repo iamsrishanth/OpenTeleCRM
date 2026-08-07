@@ -33,9 +33,15 @@ import {
 } from '@opentelecrm/db';
 import type { DbClient } from '@opentelecrm/db';
 import http from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 
 const PORT = Number(process.env.MCP_PORT ?? 3101);
 const ENTERPRISE_ID = process.env.MCP_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
+// Optional shared-secret bearer auth. When set, every MCP request must carry
+// `Authorization: Bearer <MCP_BEARER_TOKEN>` (timing-safe compare). Intended
+// for operator deployments behind a reverse proxy or direct 0.0.0.0 exposure;
+// leave unset for loopback-only / authenticated-gateway setups.
+const BEARER_TOKEN = process.env.MCP_BEARER_TOKEN ?? '';
 
 export const server = new McpServer({
   name: 'opentelecrm',
@@ -241,7 +247,26 @@ reg('get_workspace_context', {}, async () => {
 
 // ---- HTTP transport -----------------------------------------------------
 
+/** Timing-safe bearer check (constant-time on equal-length buffers). */
+function authorized(req: http.IncomingMessage): boolean {
+  if (!BEARER_TOKEN) return true; // auth disabled — operator's choice
+  const header = req.headers.authorization;
+  if (typeof header !== 'string' || !header) return false;
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(BEARER_TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 const httpServer = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
+  if (req.method !== 'OPTIONS' && !authorized(req)) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.writeHead(401, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: 'unauthorized' }));
+    return;
+  }
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
