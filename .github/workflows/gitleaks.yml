@@ -1,0 +1,27 @@
+name: Secret scan (gitleaks)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # Manual trigger so the operator can re-scan after history rewrites.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can scan every commit, not just HEAD.
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fail the build on any finding (default is warn-only).
+          GITLEAKS_NOTICE_PRE_COMMIT: "false"
