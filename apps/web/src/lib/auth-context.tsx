@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { setApiCtx } from './api'
-import { API_BASE } from './config'
+import { getApiBase } from './config'
 
 const TOKEN_KEY = 'opentelecrm.token'
 const EID_KEY = 'opentelecrm.enterpriseId'
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const segments = finalToken.split('.')
     if (segments.length !== 3) {
       // Otherwise exchange the enterprise secret for a sync token.
-      const res = await fetch(`${API_BASE}/enterprise/${eid.trim()}/auth/exchange`, {
+      const res = await fetch(`${getApiBase()}/enterprise/${eid.trim()}/auth/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ secret: finalToken }),

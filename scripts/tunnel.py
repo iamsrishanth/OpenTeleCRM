@@ -157,11 +157,25 @@ def ensure_ingress(token: str, account_id: str, tunnel_id: str, hostname: str, l
         sys.exit(f"ERROR: could not read tunnel config: {r.get('errors')}")
     config = r.get("result", {}).get("config", {})
     ingress = config.get("ingress", [])
-    if any(entry.get("hostname") == hostname for entry in ingress):
-        print(f"cloudflare: ingress rule already present for {hostname}")
-        return
+    service = f"http://localhost:{local_port}"
+
+    # Repoint if the hostname exists but targets a different local port.
+    for entry in ingress:
+        if entry.get("hostname") == hostname:
+            if entry.get("service") == service:
+                print(f"cloudflare: ingress rule already present for {hostname} -> {service}")
+            else:
+                entry["service"] = service
+                payload = {"config": {"ingress": ingress, "warp-routing": config.get("warp-routing", {"enabled": False})}}
+                r = cf("PUT", url, token, payload)
+                if r.get("success"):
+                    print(f"cloudflare: ingress rule REPOINTED {hostname} -> {service}")
+                else:
+                    sys.exit(f"ERROR: ingress PUT (repoint) failed: {r.get('errors')}")
+            return
+
     # Insert BEFORE the catch-all http_status:404 rule — rules are matched in order.
-    new_ingress = [{"service": f"http://localhost:{local_port}", "hostname": hostname}]
+    new_ingress = [{"service": service, "hostname": hostname}]
     for entry in ingress:
         if entry.get("service") == "http_status:404":
             new_ingress.append(entry)
@@ -172,7 +186,7 @@ def ensure_ingress(token: str, account_id: str, tunnel_id: str, hostname: str, l
     payload = {"config": {"ingress": new_ingress, "warp-routing": config.get("warp-routing", {"enabled": False})}}
     r = cf("PUT", url, token, payload)
     if r.get("success"):
-        print(f"cloudflare: ingress rule added for {hostname} -> localhost:{local_port}")
+        print(f"cloudflare: ingress rule added for {hostname} -> {service}")
     else:
         sys.exit(f"ERROR: ingress PUT failed: {r.get('errors')}")
 
@@ -208,6 +222,10 @@ def cmd_on() -> None:
     base = require(env, "TUNNEL_BASE_URL", "e.g. https://crm.example.com")
     token = require(env, "CLOUDFLARE_API_TOKEN", "a Cloudflare API token with DNS:Edit + Tunnel:Write scope")
     hostname = domain_from_base(base)
+    # Optional API tunnel hostname (e.g. https://api.crm.example.com). When
+    # unset, the web hostname carries the API too (back-compat, port 3005).
+    api_base = env.get("TUNNEL_API_BASE_URL", "").strip()
+    api_hostname = domain_from_base(api_base) if api_base else None
 
     account_id = require(env, "CLOUDFLARE_ACCOUNT_ID", "Cloudflare account tag (Zero Trust dashboard)")
     tunnel_id = require(env, "CLOUDFLARE_TUNNEL_ID", "the named tunnel UUID")
@@ -215,7 +233,15 @@ def cmd_on() -> None:
 
     print(f"cloudflare: ensuring {hostname} on tunnel {tunnel_id}")
     ensure_dns_cname(token, zone_id, hostname, tunnel_id)
-    ensure_ingress(token, account_id, tunnel_id, hostname)
+    if api_hostname:
+        print(f"cloudflare: ensuring {hostname} (web -> 3007) on tunnel {tunnel_id}")
+        ensure_ingress(token, account_id, tunnel_id, hostname, local_port="3007")
+        print(f"cloudflare: ensuring {api_hostname} (api -> 3005) on tunnel {tunnel_id}")
+        ensure_dns_cname(token, zone_id, api_hostname, tunnel_id)
+        ensure_ingress(token, account_id, tunnel_id, api_hostname, local_port="3005")
+    else:
+        # Back-compat single-hostname mode: the web hostname carries the API.
+        ensure_ingress(token, account_id, tunnel_id, hostname, local_port="3005")
     ensure_connector(env)
 
     # Snapshot root .env BEFORE mutating PUBLIC_BASE_URL (preserves comments).
@@ -225,11 +251,15 @@ def cmd_on() -> None:
         print("env: backed up .env -> .env.tunnel.bak")
     set_env_value(ENV_PATH, "PUBLIC_BASE_URL", base)
 
+    # Explicit tunnel mode in the web app uses the API hostname when present,
+    # otherwise the web hostname (back-compat). With runtime derivation the
+    # env.local is optional; it pins tunnel mode for `make tunnel` semantics.
+    api_for_web = api_base or base
     WEB_ENV_LOCAL.parent.mkdir(parents=True, exist_ok=True)
     WEB_ENV_LOCAL.write_text(
-        f"NEXT_PUBLIC_API_ACCESS=tunnel\nNEXT_PUBLIC_API_TUNNEL_BASE={base}\n"
+        f"NEXT_PUBLIC_API_ACCESS=tunnel\nNEXT_PUBLIC_API_TUNNEL_BASE={api_for_web}\n"
     )
-    print(f"env: wrote apps/web/.env.local (NEXT_PUBLIC_API_ACCESS=tunnel)")
+    print(f"env: wrote apps/web/.env.local (NEXT_PUBLIC_API_ACCESS=tunnel -> {api_for_web})")
     print(f"env: PUBLIC_BASE_URL set to {base} in .env")
     print("done: restart the web dev server to pick up NEXT_PUBLIC vars")
 

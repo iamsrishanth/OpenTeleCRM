@@ -40,9 +40,13 @@ async function bootstrap() {
   // First-class web client (apps/web) on a different origin in dev.
   // Explicit allowlist, NOT origin:true — origin:true reflects any origin
   // with credentials, which is only safe while auth is Bearer-header based.
-  // CORS_ORIGINS is a comma-separated list; default covers the local web desk
-  // and the tunnel hostname used by `make tunnel`.
-  const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3007,http://127.0.0.1:3007')
+  // CORS_ORIGINS is a comma-separated list; default covers the web desk on
+  // localhost, LAN IP, Tailnet (IP + hostname), and the Cloudflare tunnel
+  // web origin (crm.srishanth.com).
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ??
+    'http://localhost:3007,http://127.0.0.1:3007,http://192.168.29.240:3007,http://100.84.197.35:3007,http://zeus-server.parrot-anaconda.ts.net:3007,https://crm.srishanth.com'
+  )
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);

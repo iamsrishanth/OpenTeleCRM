@@ -111,10 +111,10 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Quick actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button render={<Link href="/leads" />}>
+          <Button render={<Link href="/leads" />} nativeButton={false}>
             <Plus className="size-4" /> New Lead
           </Button>
-          <Button variant="outline" render={<Link href="/inbox" />}>
+          <Button variant="outline" render={<Link href="/inbox" />} nativeButton={false}>
             <MessageSquare className="size-4" /> Open Inbox
           </Button>
         </div>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
               <CardTitle>Recent Activity</CardTitle>
               <CardDescription>Latest leads in the pipeline</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" render={<Link href="/leads" />}>
+            <Button variant="ghost" size="sm" render={<Link href="/leads" />} nativeButton={false}>
               View all <ArrowRight className="ml-1 size-3.5" />
             </Button>
           </CardHeader>

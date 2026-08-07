@@ -1,6 +1,6 @@
 'use client'
 
-import { API_BASE } from './config'
+import { getApiBase } from './config'
 
 export class ApiError extends Error {
   constructor(
@@ -44,7 +44,7 @@ async function request<T>(
 ): Promise<T> {
   const ctx = _ctx
   if (!ctx) throw new ApiError(401, { error: 'not authenticated' })
-  const url = `${API_BASE}/enterprise/${ctx.enterpriseId}${path}`
+  const url = `${getApiBase()}/enterprise/${ctx.enterpriseId}${path}`
   const res = await fetch(url, {
     method,
     headers: {
