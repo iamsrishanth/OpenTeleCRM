@@ -12,10 +12,11 @@ import { WhatsappModule } from './whatsapp/whatsapp.module.js';
 import { TelephonyModule } from './telephony/telephony.module.js';
 import { AutomationModule } from './automation/automation.module.js';
 import { SequencesModule } from './sequences/sequences.module.js';
+import { WorkforceModule } from './workforce/workforce.module.js';
 import { DashboardController } from './dashboard/dashboard.controller.js';
 
 @Module({
-  imports: [DatabaseModule, AuditModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule, TelephonyModule, AutomationModule, SequencesModule],
+  imports: [DatabaseModule, AuditModule, AuthModule, AsyncModule, TeamModule, MetaModule, SyncModule, WhatsappModule, TelephonyModule, AutomationModule, SequencesModule, WorkforceModule],
   controllers: [HealthController, MetadataController, DashboardController],
 })
 export class AppModule {}
