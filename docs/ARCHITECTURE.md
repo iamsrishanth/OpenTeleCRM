@@ -438,6 +438,34 @@ prod — RSAL concern), **NATS** (service messaging), **Meilisearch** (lead sear
 
 ---
 
+## Workforce management (ByteCodeEMS port, 2026-08-10)
+
+Parallel domain added to the same rails (RLS + audit + automation + web +
+mobile). See docs/PARITY.md §A9, docs/ROADMAP.md §W1, ADR-0030.
+
+- **Schema:** `packages/db/src/workforce-schema.ts` — department, attendance,
+  eod_report, task, metric_definition, target, daily_metric_entry,
+  weekly_report, device_call; `team_member` extended (department_id,
+  manager_id, join_date, employment_status). 37 tenant tables, migrations
+  0008/0009.
+- **API:** `services/api/src/workforce/` — attendance (GPS check-in/out),
+  eod, tasks, departments, metrics, reports + CSV exports, device-calls,
+  GET /me, GET/PATCH /team (admin). `requireRole()` gate on top of the
+  tenant-scoped AuthGuard.
+- **Scheduling:** `WorkforceJobsService` (EOD cutoff 12:30 UTC Mon–Sat,
+  Saturday weekly rollup, daily overdue-task sweep) hooked into the
+  `AutomationScheduler` 60s tick behind UTC-shifted `isCronMatch` guards.
+- **Automation:** 6 new trigger kinds (attendance_checked_in/out,
+  eod_submitted/missed, task_assigned/overdue) — emitters in
+  `workforce/events.ts`, fired after audit at controller call sites.
+- **Web:** /attendance, /eod, /tasks, /reports, /admin/departments,
+  /admin/team + role-gated Workforce/Admin nav groups (GET /me).
+- **Mobile:** :feature:attendance (LocationManager GPS), :feature:eod,
+  :feature:tasks, :feature:calls (SIM-aware CallLog import via
+  PHONE_ACCOUNT_ID) + bottom NavigationBar.
+
+---
+
 ## Web desk networking & supervision
 
 **Runtime API-base derivation** (`apps/web/src/lib/config.ts` `getApiBase()`):
