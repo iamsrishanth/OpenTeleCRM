@@ -426,3 +426,86 @@ data class WhatsAppTemplate(
 data class WhatsAppTemplatesResponse(
     val data: List<WhatsAppTemplate> = emptyList(),
 )
+
+// ─── Workforce (ByteCodeEMS port, M4) ────────────────────────────────────────
+
+@Serializable
+data class AttendanceDto(
+    val id: String,
+    val workDate: String,
+    val checkInAt: String? = null,
+    val checkOutAt: String? = null,
+    val status: String = "",
+    val totalHours: String? = null,
+    val source: String = "mobile",
+)
+
+@Serializable
+data class EodReportDto(
+    val id: String,
+    val reportDate: String,
+    val summary: String,
+    val hoursWorked: String? = null,
+    val status: String = "",
+    val submittedAt: String? = null,
+)
+
+@Serializable
+data class TaskDto(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val assignedToMemberId: String = "",
+    val assignedByMemberId: String? = null,
+    val priority: String = "medium",
+    val status: String = "todo",
+    val dueDate: String? = null,
+    val completedAt: String? = null,
+)
+
+@Serializable
+data class DeviceCallDto(
+    val phoneNumber: String,
+    val callType: String,
+    val durationSec: Int = 0,
+    val startedAt: String,
+    val simSlot: String? = null,
+    val simCarrier: String? = null,
+)
+
+@Serializable
+data class DeviceCallImportRequest(val calls: List<DeviceCallDto>)
+
+@Serializable
+data class DeviceCallImportResponse(val imported: Int = 0)
+
+@Serializable
+data class MeDto(
+    val memberId: String? = null,
+    val roleName: String = "",
+    val name: String? = null,
+    val departmentId: String? = null,
+)
+
+@Serializable
+data class CheckInOutRequest(val lat: Double? = null, val lng: Double? = null, val source: String = "mobile")
+
+@Serializable
+data class CreateTaskRequest(val title: String, val description: String? = null, val priority: String? = null, val dueDate: String? = null)
+
+@Serializable
+data class UpdateTaskRequest(val status: String? = null)
+
+@Serializable
+data class EodMetricDto(val metricKey: String, val value: Double)
+
+@Serializable
+data class CreateEodRequest(
+    val summary: String,
+    val hoursWorked: Double? = null,
+    val taskRefs: List<String> = emptyList(),
+    val metrics: List<EodMetricDto> = emptyList(),
+)
+
+@Serializable
+data class ListResponse<T>(val data: List<T> = emptyList(), val total: Int = 0)

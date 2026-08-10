@@ -35,4 +35,16 @@ object DatabaseModule {
 
     @Provides
     fun providePendingMutationDao(db: AppDatabase): PendingMutationDao = db.pendingMutationDao()
+
+    @Provides
+    fun provideAttendanceDao(db: AppDatabase): AttendanceDao = db.attendanceDao()
+
+    @Provides
+    fun provideEodDao(db: AppDatabase): EodDao = db.eodDao()
+
+    @Provides
+    fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
+
+    @Provides
+    fun provideDeviceCallDao(db: AppDatabase): DeviceCallDao = db.deviceCallDao()
 }

@@ -84,6 +84,10 @@ dependencies {
     implementation(project(":feature:dialer"))
     implementation(project(":feature:inbox"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:attendance"))
+    implementation(project(":feature:eod"))
+    implementation(project(":feature:tasks"))
+    implementation(project(":feature:calls"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

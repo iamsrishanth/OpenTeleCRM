@@ -22,6 +22,18 @@ import com.opentelecrm.core.model.LeadSearchResponse
 import com.opentelecrm.core.model.LeadSummary
 import com.opentelecrm.core.model.MetadataResponse
 import com.opentelecrm.core.model.TeamMembersResponse
+import com.opentelecrm.core.model.AttendanceDto
+import com.opentelecrm.core.model.CheckInOutRequest
+import com.opentelecrm.core.model.CreateEodRequest
+import com.opentelecrm.core.model.CreateTaskRequest
+import com.opentelecrm.core.model.DeviceCallDto
+import com.opentelecrm.core.model.DeviceCallImportRequest
+import com.opentelecrm.core.model.DeviceCallImportResponse
+import com.opentelecrm.core.model.EodReportDto
+import com.opentelecrm.core.model.ListResponse
+import com.opentelecrm.core.model.MeDto
+import com.opentelecrm.core.model.TaskDto
+import com.opentelecrm.core.model.UpdateTaskRequest
 import com.opentelecrm.core.model.TokenExchangeResponse
 import com.opentelecrm.core.model.SendWhatsAppRequest
 import com.opentelecrm.core.model.SendWhatsAppResponse
@@ -32,6 +44,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -163,6 +176,56 @@ interface OpenTeleCrmApi {
     /** GET /enterprise/{eid}/whatsapp/templates — approved templates. */
     @GET("enterprise/{eid}/whatsapp/templates")
     suspend fun whatsappTemplates(@Path("eid") eid: String): WhatsAppTemplatesResponse
+
+    // --- Workforce (ByteCodeEMS port, M4) ---
+
+    /** GET /enterprise/{eid}/me — current member identity. */
+    @GET("enterprise/{eid}/me")
+    suspend fun me(@Path("eid") eid: String): MeDto
+
+    /** POST /enterprise/{eid}/attendance/check-in — GPS punch-in. */
+    @POST("enterprise/{eid}/attendance/check-in")
+    suspend fun attendanceCheckIn(@Path("eid") eid: String, @Body body: CheckInOutRequest): AttendanceDto
+
+    /** POST /enterprise/{eid}/attendance/check-out. */
+    @POST("enterprise/{eid}/attendance/check-out")
+    suspend fun attendanceCheckOut(@Path("eid") eid: String, @Body body: CheckInOutRequest): AttendanceDto
+
+    /** GET /enterprise/{eid}/attendance — own history. */
+    @GET("enterprise/{eid}/attendance")
+    suspend fun attendanceList(@Path("eid") eid: String): ListResponse<AttendanceDto>
+
+    /** POST /enterprise/{eid}/eod — submit end-of-day report. */
+    @POST("enterprise/{eid}/eod")
+    suspend fun createEod(@Path("eid") eid: String, @Body body: CreateEodRequest): EodReportDto
+
+    /** GET /enterprise/{eid}/eod — own history. */
+    @GET("enterprise/{eid}/eod")
+    suspend fun eodList(@Path("eid") eid: String): ListResponse<EodReportDto>
+
+    /** GET /enterprise/{eid}/tasks — own tasks (employee) or all (admin). */
+    @GET("enterprise/{eid}/tasks")
+    suspend fun tasksList(@Path("eid") eid: String): ListResponse<TaskDto>
+
+    /** POST /enterprise/{eid}/tasks — create task (defaults to self). */
+    @POST("enterprise/{eid}/tasks")
+    suspend fun createTask(@Path("eid") eid: String, @Body body: CreateTaskRequest): TaskDto
+
+    /** PATCH /enterprise/{eid}/tasks/{taskId} — status update. */
+    @PATCH("enterprise/{eid}/tasks/{taskId}")
+    suspend fun updateTask(
+        @Path("eid") eid: String,
+        @Path("taskId") taskId: String,
+        @Body body: UpdateTaskRequest,
+    ): TaskDto
+
+    /** POST /enterprise/{eid}/device-calls — batched device call-log import. */
+    @POST("enterprise/{eid}/device-calls")
+    suspend fun importDeviceCalls(@Path("eid") eid: String, @Body body: DeviceCallImportRequest): DeviceCallImportResponse
+
+    /** GET /enterprise/{eid}/device-calls — own imported calls. */
+    @GET("enterprise/{eid}/device-calls")
+    suspend fun deviceCallsList(@Path("eid") eid: String): ListResponse<DeviceCallDto>
 }
 
 @Serializable

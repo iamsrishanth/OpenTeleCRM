@@ -8,8 +8,17 @@ import androidx.room.RoomDatabase
  * domain data is fetched fresh from the server per session.
  */
 @Database(
-    entities = [SyncStateEntity::class, LeadEntity::class, ActionEntity::class, PendingMutationEntity::class],
-    version = 3,
+    entities = [
+        SyncStateEntity::class,
+        LeadEntity::class,
+        ActionEntity::class,
+        PendingMutationEntity::class,
+        AttendanceEntity::class,
+        EodEntity::class,
+        TaskEntity::class,
+        DeviceCallEntity::class,
+    ],
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -17,4 +26,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun leadDao(): LeadDao
     abstract fun actionDao(): ActionDao
     abstract fun pendingMutationDao(): PendingMutationDao
+    abstract fun attendanceDao(): AttendanceDao
+    abstract fun eodDao(): EodDao
+    abstract fun taskDao(): TaskDao
+    abstract fun deviceCallDao(): DeviceCallDao
 }
