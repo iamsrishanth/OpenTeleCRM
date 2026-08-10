@@ -16,6 +16,7 @@ P0 Spine ─► P1 Core CRM ─► P2 WhatsApp ─► P3 Telephony ─► P4 Aut
                                                                               │
 P5 Lead capture ◄────────────────────────────────────────────────────────────┘
 P6 Analytics ─► P7 AI & Voice ─► P8 Mobile ─► P9 Admin/migration/SaaS ─► P10 Hardening & launch
+W1 Workforce management (ByteCodeEMS port) — parallel track, shipped 2026-08-10
 ```
 
 Dependency rule: each phase's exit gate requires `pnpm test` green, `make
@@ -35,6 +36,7 @@ typecheck` green, and `docs/PARITY.md` updated for its rows.
 | P6 | Analytics: ClickHouse, ECharts dashboards, reports | ❌ | `services/analytics`, `infra/native` empty |
 | P7 | AI & voice: faster-whisper, Piper, LiveKit voice agent | ❌ | `services/ai`, `services/voice-agent` empty |
 | P8 | Mobile | 🚧 (shipped M0–M5 as **Kotlin native**, ahead of plan) | commits `3347608`→`0377300` |
+| W1 | Workforce management (ByteCodeEMS port): attendance, EOD, tasks, departments/metrics, weekly reports, exports, device call tracking — web + mobile + system jobs | ✅ | commits `157b369`→`b5fe3a2` |
 | P9 | Admin, migration, SaaS-mode: roles editor, Lago billing, TeleCRM migrator | ❌ | — |
 | P10 | Hardening & launch: pen-test, SBOM, E2E, PARITY 100% | ❌ | — |
 
@@ -122,6 +124,28 @@ UnifiedPush.** M0–M5 shipped 2026-08-06:
 - M4 WhatsApp inbox + push (conversations, threads, send, templates, UnifiedPush, deep links)
 - M5 release polish (R8 minify APK 2.0MB, release signing, F-Droid metadata)
 - Remaining: Play publishing (internal track ready), iOS (out of scope for now).
+
+### W1 — Workforce management (ByteCodeEMS port) ✅ (2026-08-10)
+Parallel track: the ByteCode internal employee-management platform (attendance,
+EOD, tasks, departments/metrics, weekly reports, device call tracking) ported
+into the monorepo as a workforce domain.
+- W1.1 Schema: `workforce-schema.ts` — department, attendance, eod_report, task,
+  metric_definition, target, daily_metric_entry, weekly_report, device_call;
+  `team_member` ALTER (department_id, manager_id, join_date, employment_status);
+  RLS FORCEd on 37 tenant tables (migrations 0008/0009); Employee role + demo
+  Sales/Dev depts + leads/calls metric defs seeded.
+- W1.2 API: `services/api/src/workforce/` — 9 controllers (attendance check-in/out,
+  eod, tasks, departments, metrics, reports+CSV exports, device-calls, /me,
+  /team admin), `requireRole()` gate, audit on every mutation; contract suite
+  119/119 (12 workforce tests incl. tenant isolation + jobs).
+- W1.3 System jobs + automation: EOD cutoff (12:30 UTC Mon–Sat), Saturday weekly
+  rollup, daily overdue-task sweep — code-driven in the 60s scheduler tick
+  (UTC-shifted isCronMatch); 6 new trigger kinds (attendance_checked_in/out,
+  eod_submitted/missed, task_assigned/overdue).
+- W1.4 Web: /attendance, /eod, /tasks, /reports, /admin/departments, /admin/team
+  pages + Workforce/Admin nav groups (role-gated via GET /me) + dashboard widget.
+- W1.5 Mobile: :feature:attendance (GPS punch), :feature:eod, :feature:tasks,
+  :feature:calls (SIM-aware CallLog import) + bottom NavigationBar.
 
 ### P9 — Admin, migration, SaaS-mode ❌
 Setup wizard, roles editor (A6.3 enforcement + A6.4 admin CRUD), Lago billing
