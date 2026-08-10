@@ -20,10 +20,12 @@ import * as schema from './schema.js';
 import * as whatsappSchema from './whatsapp-schema.js';
 import * as telephonySchema from './telephony-schema.js';
 import * as automationSchema from './automation-schema.js';
+import * as workforceSchema from './workforce-schema.js';
 import { TENANT_TABLES } from './schema.js';
 import { WHATSAPP_TENANT_TABLES } from './whatsapp-schema.js';
 import { TELEPHONY_TENANT_TABLES } from './telephony-schema.js';
 import { AUTOMATION_TENANT_TABLES } from './automation-schema.js';
+import { WORKFORCE_TENANT_TABLES } from './workforce-schema.js';
 
 /** The merged set of tenant-scoped tables RLS is applied to. */
 export const ALL_TENANT_TABLES = [
@@ -31,6 +33,7 @@ export const ALL_TENANT_TABLES = [
   ...WHATSAPP_TENANT_TABLES,
   ...TELEPHONY_TENANT_TABLES,
   ...AUTOMATION_TENANT_TABLES,
+  ...WORKFORCE_TENANT_TABLES,
 ] as const;
 
 export interface RlsContext {
@@ -53,7 +56,11 @@ function tableName(table: unknown): string {
  */
 export async function enableRls(
   db: NodePgDatabase<
-    typeof schema & typeof whatsappSchema & typeof telephonySchema & typeof automationSchema
+    typeof schema &
+      typeof whatsappSchema &
+      typeof telephonySchema &
+      typeof automationSchema &
+      typeof workforceSchema
   >,
 ): Promise<void> {
   for (const table of ALL_TENANT_TABLES) {

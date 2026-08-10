@@ -6,6 +6,7 @@ export default defineConfig({
     './src/whatsapp-schema.ts',
     './src/telephony-schema.ts',
     './src/automation-schema.ts',
+    './src/workforce-schema.ts',
   ],
   out: './drizzle',
   dialect: 'postgresql',

@@ -6,6 +6,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -84,6 +85,11 @@ export const teamMember = pgTable(
     shift: varchar('shift', { length: 64 }),
     skills: jsonb('skills').$type<string[]>().default([]),
     capacity: integer('capacity').default(100),
+    // Workforce management extension (ByteCodeEMS port): department + manager + employment.
+    departmentId: uuid('department_id'),
+    managerId: uuid('manager_id'),
+    joinDate: date('join_date'),
+    employmentStatus: varchar('employment_status', { length: 16 }).default('active').notNull(),
     ...withTimestamps,
   },
   (t) => [index('tm_ent_idx').on(t.enterpriseId), index('tm_user_idx').on(t.userId)],

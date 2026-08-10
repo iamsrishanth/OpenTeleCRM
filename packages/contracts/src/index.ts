@@ -857,3 +857,96 @@ export interface AutomationEngine {
     steps: { actionConfigId: string; status: RuleRunStepStatus; reason: string }[];
   }>;
 }
+
+// ─── Workforce management (ByteCodeEMS port) ────────────────────────────────
+
+/** Attendance DTO (web + mobile client contract). */
+export interface AttendanceDto {
+  id: string;
+  memberId: string;
+  workDate: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  status: string;
+  totalHours?: string | null;
+  checkInLat?: string | null;
+  checkInLng?: string | null;
+  checkOutLat?: string | null;
+  checkOutLng?: string | null;
+  source: string;
+}
+
+/** EOD report DTO. */
+export interface EodReportDto {
+  id: string;
+  memberId: string;
+  reportDate: string;
+  summary: string;
+  hoursWorked?: string | null;
+  taskRefs: string[];
+  submittedAt: string;
+  status: string;
+}
+
+/** Task DTO. */
+export interface TaskDto {
+  id: string;
+  title: string;
+  description?: string | null;
+  assignedToMemberId: string;
+  assignedByMemberId?: string | null;
+  priority: string;
+  status: string;
+  dueDate?: string | null;
+  completedAt?: string | null;
+}
+
+/** Department DTO. */
+export interface DepartmentDto {
+  id: string;
+  name: string;
+  headMemberId?: string | null;
+  isActive: boolean;
+}
+
+/** Metric definition DTO. */
+export interface MetricDefinitionDto {
+  id: string;
+  departmentId: string;
+  key: string;
+  label: string;
+  defaultDailyTarget?: string | null;
+}
+
+/** Daily metric entry DTO. */
+export interface DailyMetricEntryDto {
+  id: string;
+  memberId: string;
+  metricKey: string;
+  entryDate: string;
+  value: string;
+}
+
+/** Weekly report DTO. */
+export interface WeeklyReportDto {
+  id: string;
+  memberId: string;
+  weekStart: string;
+  weekEnd: string;
+  metricTotals: Record<string, number>;
+  tasksCompleted: number;
+  eodSubmitted: number;
+  daysPresent: number;
+  employeeNote?: string | null;
+  generatedAt: string;
+}
+
+/** Device call DTO (batched mobile upload). */
+export interface DeviceCallDto {
+  phoneNumber: string;
+  callType: 'incoming' | 'outgoing' | 'missed';
+  durationSec: number;
+  startedAt: string;
+  simSlot?: string | null;
+  simCarrier?: string | null;
+}

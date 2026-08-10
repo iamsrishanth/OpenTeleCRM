@@ -171,3 +171,125 @@ export interface AuditLog {
   ip?: string | null;
   createdAt: string;
 }
+// ─── Workforce management (ByteCodeEMS port) ────────────────────────────────
+
+/** Team department. */
+export interface Department {
+  id: string;
+  enterpriseId: string;
+  name: string;
+  headMemberId?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One attendance day per member. */
+export interface Attendance {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  workDate: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  status: 'present' | 'late' | 'half_day' | 'absent';
+  totalHours?: string | null;
+  checkInLat?: string | null;
+  checkInLng?: string | null;
+  checkOutLat?: string | null;
+  checkOutLng?: string | null;
+  source: 'web' | 'mobile';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** End-of-day report. */
+export interface EodReport {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  reportDate: string;
+  summary: string;
+  hoursWorked?: string | null;
+  taskRefs: string[];
+  submittedAt: string;
+  status: 'submitted' | 'late' | 'missed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Assigned work item. */
+export interface Task {
+  id: string;
+  enterpriseId: string;
+  title: string;
+  description?: string | null;
+  assignedToMemberId: string;
+  assignedByMemberId?: string | null;
+  priority: 'low' | 'medium' | 'high';
+  status: 'todo' | 'in_progress' | 'blocked' | 'done';
+  dueDate?: string | null;
+  completedAt?: string | null;
+  attachments: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Department-defined metric (e.g. Sales → leads/calls). */
+export interface MetricDefinition {
+  id: string;
+  enterpriseId: string;
+  departmentId: string;
+  key: string;
+  label: string;
+  defaultDailyTarget?: string | null;
+}
+
+/** Per-member metric target override. */
+export interface MetricTarget {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  metricKey: string;
+  value: string;
+  period: 'daily' | 'weekly';
+  effectiveFrom: string;
+}
+
+/** Daily logged metric value. */
+export interface DailyMetricEntry {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  metricKey: string;
+  entryDate: string;
+  value: string;
+}
+
+/** Saturday-generated weekly summary. */
+export interface WeeklyReport {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  weekStart: string;
+  weekEnd: string;
+  metricTotals: Record<string, number>;
+  tasksCompleted: number;
+  eodSubmitted: number;
+  daysPresent: number;
+  employeeNote?: string | null;
+  generatedAt: string;
+}
+
+/** Device-side call log row (mobile call tracker). */
+export interface DeviceCall {
+  id: string;
+  enterpriseId: string;
+  memberId: string;
+  phoneNumber: string;
+  callType: 'incoming' | 'outgoing' | 'missed';
+  durationSec: number;
+  startedAt: string;
+  simSlot?: string | null;
+  simCarrier?: string | null;
+}

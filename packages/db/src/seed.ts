@@ -8,7 +8,7 @@
  * Usage: pnpm --filter @opentelecrm/db seed
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { getDb, getPool, withTenant } from './index.js';
 import {
   actionType,
@@ -23,6 +23,7 @@ import {
 } from './schema.js';
 import { conversation, waMessage, waTemplate, waSession } from './whatsapp-schema.js';
 import { call, callback, dndRegistry } from './telephony-schema.js';
+import { department, metricDefinition } from './workforce-schema.js';
 
 const LEAD_COUNT = 5_000;
 const CUSTOM_FIELDS = 20;
@@ -80,21 +81,38 @@ async function main() {
           isSystem: true,
           permissions: ['record:own', 'lead:read', 'lead:write', 'call:start', 'msg:send'],
         },
+        {
+          enterpriseId: eid,
+          name: 'Employee',
+          kind: 'employee',
+          isSystem: true,
+          permissions: [
+            'attendance:own',
+            'eod:own',
+            'task:own',
+            'metric:own',
+            'report:own',
+            'device-call:own',
+          ],
+        },
       ])
       .returning();
-    const [ownerRole, adminRole, agentRole] = roleRows;
-    if (!ownerRole || !adminRole || !agentRole) throw new Error('role insert incomplete');
+    const [ownerRole, adminRole, agentRole, employeeRole] = roleRows;
+    if (!ownerRole || !adminRole || !agentRole || !employeeRole)
+      throw new Error('role insert incomplete');
 
     // 3. Users + team members
+    const memberIds = new Map<string, string>();
     const userSpecs = [
       { email: 'owner@demo.local', name: 'Demo Owner', role: ownerRole, avail: 'available' },
       { email: 'admin@demo.local', name: 'Demo Admin', role: adminRole, avail: 'available' },
       { email: 'agent@demo.local', name: 'Neha Agent', role: agentRole, avail: 'available' },
+      { email: 'employee@demo.local', name: 'Ravi Employee', role: employeeRole, avail: 'available' },
     ];
     for (const spec of userSpecs) {
       const [u] = await db.insert(user).values({ email: spec.email, name: spec.name }).returning();
       if (!u) throw new Error('user insert returned no row');
-      await db
+      const [tm] = await db
         .insert(teamMember)
         .values({
           enterpriseId: eid,
@@ -102,8 +120,57 @@ async function main() {
           roleId: spec.role.id,
           availabilityState: spec.avail,
         })
-        .execute();
+        .returning();
+      if (!tm) throw new Error('teamMember insert returned no row');
+      memberIds.set(spec.email, tm.id);
     }
+
+    // 3b. Workforce: demo departments + metric definitions + assignments (ByteCodeEMS port).
+    const [salesDept, devDept] = await db
+      .insert(department)
+      .values([
+        { enterpriseId: eid, name: 'Sales', isActive: true },
+        { enterpriseId: eid, name: 'Dev', isActive: true },
+      ])
+      .returning();
+    if (!salesDept || !devDept) throw new Error('department insert incomplete');
+    await db
+      .insert(metricDefinition)
+      .values([
+        {
+          enterpriseId: eid,
+          departmentId: salesDept.id,
+          key: 'leads',
+          label: 'Leads',
+          defaultDailyTarget: '5',
+        },
+        {
+          enterpriseId: eid,
+          departmentId: salesDept.id,
+          key: 'calls',
+          label: 'Calls',
+          defaultDailyTarget: '30',
+        },
+      ])
+      .execute();
+    const ownerId = memberIds.get('owner@demo.local');
+    const adminId = memberIds.get('admin@demo.local');
+    const agentId = memberIds.get('agent@demo.local');
+    const employeeId = memberIds.get('employee@demo.local');
+    if (!ownerId || !adminId || !agentId || !employeeId)
+      throw new Error('member id lookup incomplete');
+    // Admin heads Sales; owner + agent in Sales; employee in Dev.
+    await db
+      .update(teamMember)
+      .set({ departmentId: salesDept.id })
+      .where(inArray(teamMember.id, [ownerId, adminId, agentId]))
+      .execute();
+    await db.update(department).set({ headMemberId: adminId }).where(eq(department.id, salesDept.id)).execute();
+    await db
+      .update(teamMember)
+      .set({ departmentId: devDept.id })
+      .where(eq(teamMember.id, employeeId))
+      .execute();
 
     // 4. Pipelines + stages
     const pipes: { pipelineId: string; stageIds: string[] }[] = [];
