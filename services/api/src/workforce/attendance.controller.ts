@@ -14,6 +14,8 @@ import { attendance, teamMember, user } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { attendanceCheckedIn, attendanceCheckedOut } from './events.js';
 import { ADMIN_ROLES, MEMBER_ROLES, requireRole } from './roles.js';
 import { WorkforceService } from './workforce.service.js';
 
@@ -31,6 +33,7 @@ export class AttendanceController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
     @Inject(WorkforceService) private readonly svc: WorkforceService,
   ) {}
 
@@ -90,6 +93,12 @@ export class AttendanceController {
         resourceId: row.id,
         after: { id: row.id, workDate, status: row.status },
       });
+      attendanceCheckedIn(this.automationService, eid, {
+        id: row.id,
+        memberId: member.id,
+        workDate,
+        status: row.status,
+      });
       return { id: row.id, workDate, checkInAt: row.checkInAt?.toISOString() ?? null, status: row.status };
     });
   }
@@ -136,6 +145,12 @@ export class AttendanceController {
         before: { checkOutAt: row.checkOutAt },
         after: { checkOutAt: now, status: upd.status, totalHours: upd.totalHours },
       });
+      attendanceCheckedOut(this.automationService, eid, {
+        id: row.id,
+        memberId: member.id,
+        workDate,
+        status: upd.status,
+      }, upd.totalHours);
       return { id: row.id, workDate, checkOutAt: now.toISOString(), status: upd.status, totalHours: upd.totalHours !== null ? String(upd.totalHours) : null };
     });
   }

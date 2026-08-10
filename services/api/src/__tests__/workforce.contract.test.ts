@@ -18,9 +18,22 @@ import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import jwt from 'jsonwebtoken';
-import { eq } from 'drizzle-orm';
-import { attendance, department, getPool, metricDefinition, role, teamMember, user, withTenant } from '@opentelecrm/db';
+import { and, eq } from 'drizzle-orm';
+import {
+  attendance,
+  department,
+  eodReport,
+  getPool,
+  metricDefinition,
+  role,
+  teamMember,
+  user,
+  weeklyReport,
+  withTenant,
+} from '@opentelecrm/db';
 import { AppModule } from '../app.module.js';
+import { WorkforceJobsService } from '../workforce/system-jobs.js';
+import { WorkforceService } from '../workforce/workforce.service.js';
 
 // Build the env key dynamically so the value isn't inlined (redaction-safe).
 const ENV_KEY = 'DEV_' + 'JWT_' + 'SECRET';
@@ -318,5 +331,65 @@ describe('tenant isolation (RLS FORCEd)', () => {
       return r;
     });
     expect(underB.length).toBe(0);
+  });
+});
+
+describe('workforce system jobs (M2)', () => {
+  async function memberIds(): Promise<{ admin: string; employee: string }> {
+    return withTenant(ENTERPRISE_ID, async (db) => {
+      const rows = await db
+        .select({ id: teamMember.id, kind: role.kind })
+        .from(teamMember)
+        .innerJoin(role, eq(teamMember.roleId, role.id))
+        .where(eq(teamMember.enterpriseId, ENTERPRISE_ID));
+      const admin = rows.find((r) => r.kind === 'admin');
+      const employee = rows.find((r) => r.kind === 'employee');
+      if (!admin?.id || !employee?.id) throw new Error('member ids not found');
+      return { admin: admin.id, employee: employee.id };
+    });
+  }
+
+  it('processEodCutoff marks non-submitters missed; a late submission upgrades to late', async () => {
+    const jobs = app.get(WorkforceJobsService);
+    const svc = app.get(WorkforceService);
+    const { admin } = await memberIds();
+    const today = svc.dateKey(new Date());
+
+    const res = await jobs.processEodCutoff(new Date());
+    expect(res.processed).toBeGreaterThanOrEqual(1);
+
+    const missed = await withTenant(ENTERPRISE_ID, async (db) => {
+      const rows = await db
+        .select({ memberId: eodReport.memberId, status: eodReport.status })
+        .from(eodReport)
+        .where(and(eq(eodReport.enterpriseId, ENTERPRISE_ID), eq(eodReport.reportDate, today)));
+      return rows;
+    });
+    expect(missed.some((r) => r.memberId === admin && r.status === 'missed')).toBe(true);
+
+    // Admin (marked missed by the cutoff) submits late → upgrades, not 400.
+    const late = await post<{ id: string; status: string }>('/eod', { summary: 'Late but done' }, adminSub);
+    expect(late.status).toBe(200);
+    expect(['submitted', 'late']).toContain(late.body.status);
+  });
+
+  it('processWeeklyRollup generates weekly_report rows with attendance/EOD counts', async () => {
+    const jobs = app.get(WorkforceJobsService);
+    const { employee } = await memberIds();
+
+    const res = await jobs.processWeeklyRollup(new Date());
+    expect(res.processed).toBeGreaterThanOrEqual(1);
+
+    const report = await withTenant(ENTERPRISE_ID, async (db) => {
+      const rows = await db
+        .select({ memberId: weeklyReport.memberId, daysPresent: weeklyReport.daysPresent, eodSubmitted: weeklyReport.eodSubmitted })
+        .from(weeklyReport)
+        .where(eq(weeklyReport.enterpriseId, ENTERPRISE_ID));
+      return rows;
+    });
+    const emp = report.find((r) => r.memberId === employee);
+    // The employee checked in/out (half_day) and submitted EOD earlier in this file.
+    expect(emp?.daysPresent).toBeGreaterThanOrEqual(1);
+    expect(emp?.eodSubmitted).toBeGreaterThanOrEqual(1);
   });
 });

@@ -13,6 +13,8 @@ import { task, teamMember } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { taskAssigned } from './events.js';
 import { ADMIN_ROLES, MEMBER_ROLES, requireRole, notFound } from './roles.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
@@ -43,6 +45,7 @@ export class TasksController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
   ) {}
 
   private assertTenant(req: FastifyRequest, eid: string): AuthContext {
@@ -108,6 +111,14 @@ export class TasksController {
         resourceType: 'task',
         resourceId: row.id,
         after: { id: row.id, title: row.title, assignedToMemberId: assignee },
+      });
+      taskAssigned(this.automationService, eid, {
+        id: row.id,
+        title: row.title,
+        assignedToMemberId: row.assignedToMemberId,
+        assignedByMemberId: row.assignedByMemberId,
+        priority: row.priority,
+        dueDate: row.dueDate,
       });
       return { id: row.id, title: row.title, status: row.status, assignedToMemberId: assignee };
     });

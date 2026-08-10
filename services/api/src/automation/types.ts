@@ -19,7 +19,14 @@ export type AutomationTriggerKind =
   | 'inbound_message'
   | 'schedule'
   | 'manual'
-  | 'webhook_received';
+  | 'webhook_received'
+  // Workforce management (ByteCodeEMS port, M2)
+  | 'attendance_checked_in'
+  | 'attendance_checked_out'
+  | 'eod_submitted'
+  | 'eod_missed'
+  | 'task_assigned'
+  | 'task_overdue';
 
 export interface AutomationTriggerSpec {
   kind: AutomationTriggerKind;

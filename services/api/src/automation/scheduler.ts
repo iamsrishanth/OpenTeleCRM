@@ -21,6 +21,8 @@ import { automation } from '@opentelecrm/db';
 import { DB_PROVIDER } from '../db/database.module.js';
 import { AutomationService } from './automation.service.js';
 import { SequencesService } from '../sequences/sequences.service.js';
+import { WorkforceJobsService } from '../workforce/system-jobs.js';
+import { isCronMatch } from './cron.js';
 
 @Injectable()
 export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
@@ -31,6 +33,7 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(AutomationService) private readonly service: AutomationService,
     @Inject(SequencesService) private readonly sequences: SequencesService,
+    @Inject(WorkforceJobsService) private readonly workforceJobs: WorkforceJobsService,
   ) {}
 
   onModuleInit(): void {
@@ -86,6 +89,28 @@ export class AutomationScheduler implements OnModuleInit, OnModuleDestroy {
       }
     } catch (err) {
       console.warn('[scheduler] sequence processing failed:', err);
+    }
+
+    // Workforce system jobs (ByteCodeEMS port, M2). cron.ts evaluates in
+    // server-local time, so shift `now` to its UTC wall-clock before matching:
+    // EOD cutoff 12:30 UTC Mon–Sat (= 6 PM IST), weekly rollup Saturday,
+    // overdue-task sweep daily at 00:30 UTC. Best-effort like sequences.
+    try {
+      const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60_000);
+      if (isCronMatch('30 12 * * 1-6', utc)) {
+        const res = await this.workforceJobs.processEodCutoff(now);
+        if (res.processed > 0) console.log(`[scheduler] EOD cutoff: ${res.processed} missed`);
+      }
+      if (isCronMatch('30 12 * * 6', utc)) {
+        const res = await this.workforceJobs.processWeeklyRollup(now);
+        if (res.processed > 0) console.log(`[scheduler] weekly rollup: ${res.processed} report(s)`);
+      }
+      if (isCronMatch('30 0 * * *', utc)) {
+        const res = await this.workforceJobs.processOverdueTasks(now);
+        if (res.processed > 0) console.log(`[scheduler] overdue tasks: ${res.processed} fired`);
+      }
+    } catch (err) {
+      console.warn('[scheduler] workforce jobs failed:', err);
     }
   }
 }

@@ -12,6 +12,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../db/database.module.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { WorkforceModule } from '../workforce/workforce.module.js';
 import { ActionDispatcher, evaluateActionConfig } from './dispatcher.js';
 import { AutomationService } from './automation.service.js';
 import { AutomationMeter } from './meter.js';
@@ -26,7 +27,7 @@ export type { AutomationEvent, AutomationRule, AutomationRun } from './types.js'
 
 @Global()
 @Module({
-  imports: [DatabaseModule, AuditModule],
+  imports: [DatabaseModule, AuditModule, WorkforceModule],
   providers: [AutomationService, ActionDispatcher, AutomationScheduler, AutomationMeter],
   controllers: [RulesController, DistributionController, WebhookController],
   exports: [AutomationService, ActionDispatcher, AutomationMeter],

@@ -13,6 +13,7 @@ import { MetricsController } from './metrics.controller.js';
 import { ReportsController } from './reports.controller.js';
 import { DeviceCallsController } from './device-calls.controller.js';
 import { WorkforceService } from './workforce.service.js';
+import { WorkforceJobsService } from './system-jobs.js';
 
 @Module({
   controllers: [
@@ -24,7 +25,7 @@ import { WorkforceService } from './workforce.service.js';
     ReportsController,
     DeviceCallsController,
   ],
-  providers: [WorkforceService],
-  exports: [WorkforceService],
+  providers: [WorkforceService, WorkforceJobsService],
+  exports: [WorkforceService, WorkforceJobsService],
 })
 export class WorkforceModule {}

@@ -13,6 +13,8 @@ import { dailyMetricEntry, eodReport, teamMember, user } from '@opentelecrm/db';
 import type { AuthContext } from '../auth/auth.guard.js';
 import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { AutomationService } from '../automation/automation.service.js';
+import { eodSubmitted } from './events.js';
 import { ADMIN_ROLES, MEMBER_ROLES, requireRole } from './roles.js';
 import { WorkforceService } from './workforce.service.js';
 
@@ -36,6 +38,7 @@ export class EodController {
     @Inject(DB_PROVIDER) private db: DbClient,
     @Inject(TENANT_WRAPPER) private withTenant: TenantFn,
     @Inject(AuditService) private readonly auditService: AuditService,
+    @Inject(AutomationService) private readonly automationService: AutomationService,
     @Inject(WorkforceService) private readonly svc: WorkforceService,
   ) {}
 
@@ -67,26 +70,41 @@ export class EodController {
       const reportDate = this.svc.dateKey(now);
 
       const existing = await db
-        .select({ id: eodReport.id })
+        .select()
         .from(eodReport)
         .where(and(eq(eodReport.enterpriseId, eid), eq(eodReport.memberId, member.id), eq(eodReport.reportDate, reportDate)))
         .limit(1);
-      if (existing[0]) throw this.validationError('EOD already submitted for today');
+      // A 'missed' row is created by the EOD cutoff job (12:30 UTC). A late
+      // submission after the cutoff upgrades it to 'late' instead of 400.
+      if (existing[0] && existing[0].status !== 'missed') {
+        throw this.validationError('EOD already submitted for today');
+      }
 
-      const [row] = await db
-        .insert(eodReport)
-        .values({
-          enterpriseId: eid,
-          memberId: member.id,
-          reportDate,
-          summary: summary.trim(),
-          hoursWorked: dto?.hoursWorked !== undefined ? String(dto.hoursWorked) : null,
-          taskRefs,
-          submittedAt: now,
-          status: this.svc.eodStatus(now),
-        })
-        .returning();
-      if (!row) throw new Error('eod insert returned no row');
+      const status = this.svc.eodStatus(now);
+      let row = existing[0];
+      if (row) {
+        await db
+          .update(eodReport)
+          .set({ summary: summary.trim(), hoursWorked: dto?.hoursWorked !== undefined ? String(dto.hoursWorked) : null, taskRefs, submittedAt: now, status })
+          .where(eq(eodReport.id, row.id));
+        row = { ...row, summary: summary.trim(), hoursWorked: dto?.hoursWorked !== undefined ? String(dto.hoursWorked) : null, taskRefs, submittedAt: now, status };
+      } else {
+        const [inserted] = await db
+          .insert(eodReport)
+          .values({
+            enterpriseId: eid,
+            memberId: member.id,
+            reportDate,
+            summary: summary.trim(),
+            hoursWorked: dto?.hoursWorked !== undefined ? String(dto.hoursWorked) : null,
+            taskRefs,
+            submittedAt: now,
+            status,
+          })
+          .returning();
+        if (!inserted) throw new Error('eod insert returned no row');
+        row = inserted;
+      }
 
       // Upsert sales metrics into daily_metric_entry (member + key + date).
       if (Array.isArray(dto?.metrics)) {
@@ -131,6 +149,12 @@ export class EodController {
         resourceType: 'eod_report',
         resourceId: row.id,
         after: { id: row.id, reportDate, status: row.status },
+      });
+      eodSubmitted(this.automationService, eid, {
+        id: row.id,
+        memberId: member.id,
+        reportDate,
+        status: row.status,
       });
       return { id: row.id, reportDate, status: row.status };
     });
