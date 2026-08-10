@@ -9,9 +9,9 @@ User=sri
 Group=sri
 WorkingDirectory=/mnt/data/Projects/ByteCodeCRM
 Environment=HOME=/home/sri
-# dev.sh sources .env (DATABASE_URL, DEV_JWT_SECRET...) and exports
-# PORT_OVERRIDE=3005, then execs tsx on src/main.ts (no watch — single process).
-ExecStart=/bin/bash /mnt/data/Projects/ByteCodeCRM/services/api/dev.sh
+# Portable launcher (same script macOS launchd uses): sources .env, resolves
+# node + tsx dynamically, exports PORT_OVERRIDE=3005, no watch flag.
+ExecStart=/bin/bash /mnt/data/Projects/ByteCodeCRM/infra/launchers/launch-api.sh
 Restart=always
 RestartSec=5
 StandardOutput=journal

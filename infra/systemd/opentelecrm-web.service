@@ -7,10 +7,12 @@ After=network-online.target opentelecrm-api.service
 Type=simple
 User=sri
 Group=sri
-WorkingDirectory=/mnt/data/Projects/ByteCodeCRM/apps/web
+WorkingDirectory=/mnt/data/Projects/ByteCodeCRM
 Environment=HOME=/home/sri
 Environment=PATH=/home/sri/.hermes/profiles/main/home/.nvm/versions/node/v22.23.1/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/sri/.hermes/profiles/main/home/.nvm/versions/node/v22.23.1/bin/node /mnt/data/Projects/ByteCodeCRM/apps/web/node_modules/next/dist/bin/next dev -p 3007 -H 0.0.0.0
+# Portable launcher (same script macOS launchd uses): resolves node, boots
+# next dev on :3007 (PORT_OVERRIDE override) bound to 0.0.0.0.
+ExecStart=/bin/bash /mnt/data/Projects/ByteCodeCRM/infra/launchers/launch-web.sh
 Restart=always
 RestartSec=5
 StandardOutput=journal

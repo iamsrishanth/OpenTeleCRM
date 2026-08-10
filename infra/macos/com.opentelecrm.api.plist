@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.opentelecrm.api</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/PATH/TO/OpenTeleCRM/infra/launchers/launch-api.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/PATH/TO/OpenTeleCRM</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/opentelecrm-api.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/opentelecrm-api.err.log</string>
+</dict>
+</plist>
