@@ -141,3 +141,103 @@ export function asList<T>(data: unknown, key = 'items'): T[] {
   }
   return []
 }
+
+// ─── Workforce management (ByteCodeEMS port) ─────────────────────────────────
+
+export interface AttendanceRecord {
+  id: string
+  workDate: string
+  checkInAt?: string | null
+  checkOutAt?: string | null
+  status: string
+  totalHours?: string | null
+  source: string
+}
+
+export interface AdminAttendanceRow {
+  id: string
+  memberId: string
+  name: string
+  checkInAt?: string | null
+  checkOutAt?: string | null
+  status: string
+  totalHours?: string | null
+}
+
+export interface EodReport {
+  id: string
+  reportDate: string
+  summary: string
+  hoursWorked?: string | null
+  taskRefs: string[]
+  submittedAt: string
+  status: string
+}
+
+export interface EodComplianceRow {
+  memberId: string
+  name: string
+  submitted: boolean
+  status: string
+}
+
+export interface TaskItem {
+  id: string
+  title: string
+  description?: string | null
+  assignedToMemberId: string
+  assignedByMemberId?: string | null
+  priority: string
+  status: string
+  dueDate?: string | null
+  completedAt?: string | null
+  createdAt: string
+}
+
+export interface DepartmentItem {
+  id: string
+  name: string
+  headMemberId?: string | null
+  headName?: string | null
+  isActive: boolean
+}
+
+export interface MetricDefinitionItem {
+  id: string
+  departmentId: string
+  key: string
+  label: string
+  defaultDailyTarget?: string | null
+}
+
+export interface MetricEntry {
+  id: string
+  metricKey: string
+  entryDate: string
+  value: string
+}
+
+export interface MetricDailyView {
+  date: string
+  metrics: { key: string; label: string; defaultDailyTarget?: string | null }[]
+  members: { memberId: string; name: string; values: Record<string, string> }[]
+}
+
+export interface WeeklyReportItem {
+  id: string
+  weekStart: string
+  weekEnd: string
+  metricTotals: Record<string, number>
+  tasksCompleted: number
+  eodSubmitted: number
+  daysPresent: number
+  employeeNote?: string | null
+  generatedAt: string
+}
+
+export interface TeamMemberInfo {
+  id: string
+  name: string
+  roleName: string
+  departmentId?: string | null
+}

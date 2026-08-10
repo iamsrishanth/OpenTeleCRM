@@ -4,8 +4,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
+  BarChart3,
   BellRing,
+  Building2,
+  CalendarCheck,
+  FileText,
   LayoutDashboard,
+  ListChecks,
   ListOrdered,
   LogOut,
   Megaphone,
@@ -20,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { asList, type WhatsAppConversation } from '@/lib/types'
+import { useRole } from '@/lib/roles'
 
 const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,10 +41,23 @@ const NAV = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const WORKFORCE_NAV = [
+  { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
+  { href: '/eod', label: 'EOD Reports', icon: FileText },
+  { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
+]
+
+const ADMIN_NAV = [
+  { href: '/admin/departments', label: 'Departments', icon: Building2 },
+  { href: '/admin/team', label: 'Team', icon: Users },
+]
+
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { token, enterpriseId, logout } = useAuth()
+  const { isAdmin, ready: roleReady } = useRole()
   const [unread, setUnread] = useState(0)
 
   useEffect(() => {
@@ -95,6 +114,56 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        <div className="pt-4">
+          <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            Workforce
+          </p>
+          {WORKFORCE_NAV.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href)
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                  active
+                    ? 'bg-primary/15 font-medium text-primary'
+                    : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                )}
+              >
+                <Icon className="size-4" />
+                <span className="flex-1">{label}</span>
+              </Link>
+            )
+          })}
+        </div>
+
+        {isAdmin && roleReady && (
+          <div className="pt-2">
+            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              Admin
+            </p>
+            {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                    active
+                      ? 'bg-primary/15 font-medium text-primary'
+                      : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  )}
+                >
+                  <Icon className="size-4" />
+                  <span className="flex-1">{label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </nav>
 
       <div className="border-t border-sidebar-border p-3">

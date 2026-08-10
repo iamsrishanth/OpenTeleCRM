@@ -12,6 +12,12 @@ const TITLES: Record<string, string> = {
   '/inbox': 'Inbox',
   '/settings': 'Settings',
   '/login': 'Sign in',
+  '/attendance': 'Attendance',
+  '/eod': 'EOD Reports',
+  '/tasks': 'Tasks',
+  '/reports': 'Reports',
+  '/admin/departments': 'Departments',
+  '/admin/team': 'Team',
 }
 
 export function Topnav() {

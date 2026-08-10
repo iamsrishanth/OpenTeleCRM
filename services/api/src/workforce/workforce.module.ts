@@ -12,6 +12,8 @@ import { DepartmentsController } from './departments.controller.js';
 import { MetricsController } from './metrics.controller.js';
 import { ReportsController } from './reports.controller.js';
 import { DeviceCallsController } from './device-calls.controller.js';
+import { MeController } from './me.controller.js';
+import { TeamAdminController } from './team-admin.controller.js';
 import { WorkforceService } from './workforce.service.js';
 import { WorkforceJobsService } from './system-jobs.js';
 
@@ -24,6 +26,8 @@ import { WorkforceJobsService } from './system-jobs.js';
     MetricsController,
     ReportsController,
     DeviceCallsController,
+    MeController,
+    TeamAdminController,
   ],
   providers: [WorkforceService, WorkforceJobsService],
   exports: [WorkforceService, WorkforceJobsService],

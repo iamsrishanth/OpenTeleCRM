@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { EmptyState, LoadingScreen } from '@/components/loading'
+import { WorkforceToday } from '@/components/workforce-today'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -118,6 +119,9 @@ export default function DashboardPage() {
             <MessageSquare className="size-4" /> Open Inbox
           </Button>
         </div>
+
+        {/* Workforce (ByteCodeEMS port) */}
+        <WorkforceToday />
 
         {/* Stats */}
         {statsError ? (
