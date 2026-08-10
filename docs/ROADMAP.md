@@ -30,7 +30,7 @@ typecheck` green, and `docs/PARITY.md` updated for its rows.
 | P2 | WhatsApp: contracts, drivers, inbox, templates, broadcasts | ✅ (API-level) | whatsapp package + contract suites |
 | P3 | Telephony: dialer, calls, caller-id, callbacks, recordings | ✅ | [docs/PLAN-P3.md](./PLAN-P3.md) |
 | P4 | Automation: rule-engine, rules CRUD, events, distribution, webhook, scheduler | ✅ | [docs/PLAN-P4.md](./PLAN-P4.md) |
-| P4b | Web desk, automation UI, React Flow builder, sequences, quota metering, live Asterisk/WhatsApp wiring | ✅ (Temporal deferred) | commits `9f641e0`→`676549a` |
+| P4b | Web desk, automation UI, React Flow builder, sequences, quota metering, live Asterisk/WhatsApp wiring | ✅ (Temporal deferred) | commits `9f641e0`→`676549a`; ops hardening `32301db`→`a0733e8` (runtime API-base derivation, tunnel split web/API, systemd + launchd supervision) |
 | P5 | Lead capture: connector SDK, ingest log, first connectors | ❌ | `services/ingest`, `packages/connectors` empty |
 | P6 | Analytics: ClickHouse, ECharts dashboards, reports | ❌ | `services/analytics`, `infra/native` empty |
 | P7 | AI & voice: faster-whisper, Piper, LiveKit voice agent | ❌ | `services/ai`, `services/voice-agent` empty |
@@ -165,5 +165,5 @@ next.**
 
 ---
 
-_Last updated: 2026-08-06. Keep in sync with git history + `docs/PARITY.md` as
+_Last updated: 2026-08-10. Keep in sync with git history + `docs/PARITY.md` as
 phases land._

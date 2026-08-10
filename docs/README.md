@@ -16,7 +16,7 @@ what you're doing:
 | Doc | What it is |
 |-----|------------|
 | [PARITY.md](./PARITY.md) | TeleCRM feature-parity matrix (A1–A8, B, divergences D1–D6) — update on every feature landing |
-| [DECISIONS.md](./DECISIONS.md) | ADR log (ADR-0001 → ADR-0030) — read before changing stack/infra choices |
+| [DECISIONS.md](./DECISIONS.md) | ADR log (ADR-0001 → ADR-0031) — read before changing stack/infra choices |
 | [RISKS.md](./RISKS.md) | Risk register (WhatsApp ToS, recording privacy, RLS, license leaks, mobile keystore) — review per wave |
 | [LICENSES.md](./LICENSES.md) | License posture for every component (project = AGPL-3.0) |
 
@@ -38,6 +38,7 @@ the current source of truth for what's next.**
 | [../services/whatsapp-bridge/README.md](../services/whatsapp-bridge/README.md) | Standalone Baileys bridge — deploy-anywhere WhatsApp |
 | [../packages/rule-engine/README.md](../packages/rule-engine/README.md) | Pure-TS automation evaluator |
 | [../infra/asterisk/README.md](../infra/asterisk/README.md) | Asterisk 21 LTS PBX scaffold (source build, ARI) |
+| [../infra/macos/README.md](../infra/macos/README.md) | Cross-platform runbook: portable launchers, systemd + launchd, brew provisioning |
 | [../apps/mobile/README.md](../apps/mobile/README.md) | Kotlin-native Android client (modules, build, F-Droid) |
 
 ## Doc conventions

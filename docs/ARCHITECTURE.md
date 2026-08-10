@@ -66,7 +66,7 @@ flowchart LR
     API[NestJS API service<br/>services/api · :3005<br/>/autoupdate/v2]
     MCP[MCP server<br/>services/mcp · :3100<br/>/mcp Streamable HTTP]
     WS[Standalone WhatsApp bridge<br/>services/whatsapp-bridge · :3098<br/>Baileys 7.x · own session/queue]
-    WEB[Next.js agent desk<br/>apps/web · :3000]
+    WEB[Next.js agent desk<br/>apps/web · :3007]
     CD[(core-domain<br/>domain types)]
     DB[(db<br/>drizzle schema + RLS + seed)]
     CT[(contracts<br/>shared wire types)]
@@ -101,7 +101,7 @@ flowchart LR
 | WhatsApp drivers | `services/whatsapp` | — | TS lib | mock / wwebjs / baileys / bridge drivers behind `WhatsAppProvider` |
 | Standalone WhatsApp bridge | `services/whatsapp-bridge` | `3098` | HTTP | Deploy-anywhere Baileys 7.x bridge — own session + own inbound queue (`/health`, `/send`, `/messages`, `/typing`) |
 | Telephony | `services/telephony` | — | TS lib | Dialer scoring + mock / asterisk-ari providers (live ARI) |
-| Web agent desk | `apps/web` | `3000` | Next.js | Dashboard, leads, inbox, dialer, automations (+ React Flow builder), sequences, webhooks, broadcasts, templates, callbacks, settings |
+| Web agent desk | `apps/web` | `3007` | Next.js | Dashboard, leads, inbox, dialer, automations (+ React Flow builder), sequences, webhooks, broadcasts, templates, callbacks, settings |
 | Mobile app | `apps/mobile` | — | Android (Kotlin) | Offline-first agent client: leads, dialer + caller-ID, WhatsApp inbox, team, settings |
 | `core-domain` | `packages/core-domain` | — | TS lib | Domain types mirroring TeleCRM's model |
 | `contracts` | `packages/contracts` | — | TS lib | Shared zod/TS wire types (WhatsApp/Telephony/Automation) |
@@ -438,13 +438,36 @@ prod — RSAL concern), **NATS** (service messaging), **Meilisearch** (lead sear
 
 ---
 
+## Web desk networking & supervision
+
+**Runtime API-base derivation** (`apps/web/src/lib/config.ts` `getApiBase()`):
+the desk resolves its API origin from `window.location` at request time, so
+one bundle serves every surface — localhost, LAN IP, Tailnet (IP or hostname),
+and the Cloudflare tunnel. When served from `crm.srishanth.com` it calls
+`https://api.srishanth.com/autoupdate/v2`; everywhere else it calls the same
+host on `:3005`. No build-time flag, no baked origin. CSP `connect-src` and the
+API's CORS allowlist (`CORS_ORIGINS` in `.env`) both cover all four surfaces.
+
+**Cross-platform supervision** — one portable launcher pair powers both OSes:
+
+| Platform | Supervisor | Unit | Launcher |
+|----------|-----------|------|----------|
+| Linux | systemd | `infra/systemd/opentelecrm-{api,web}.service` | `infra/launchers/launch-{api,web}.sh` |
+| macOS | launchd | `infra/macos/com.opentelecrm.{api,web}.plist` | same launchers |
+
+The launchers resolve `node` dynamically (Homebrew → nvm → PATH), source
+`.env`, and exec without a `--watch` flag so the supervisor can restart them
+cleanly. Provisioning: `scripts/provision/debian.sh` (Linux) vs
+`infra/macos/provision-brew.sh` (Homebrew). Full runbook:
+[`infra/macos/README.md`](../infra/macos/README.md).
+
 ## Ports & run targets (native dev)
 
 | Thing | Value |
 |-------|-------|
 | API HTTP | `:3005` (`services/api/dev.sh`, `PORT_OVERRIDE`) |
 | MCP HTTP | `:3100`, path `/mcp` (`services/mcp/dev.sh`; code default `MCP_PORT` is 3101 — dev.sh pins 3100) |
-| Web app | `:3000` (`apps/web`, `next dev` default) |
+| Web app | `:3007` (`apps/web`, `next dev -p 3007 -H 0.0.0.0`) |
 | WhatsApp bridge | `:3098` (`services/whatsapp-bridge`) |
 | Asterisk ARI | `127.0.0.1:8088` (loopback only, user `opentelecrm`) |
 | Postgres | `127.0.0.1:5432/opentelecrm` (role `opentelecrm`, non-owner) |

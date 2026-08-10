@@ -39,6 +39,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 | [ADR-0028](#adr-0028-call-recording-storage-object-storage--signed-urls) | Call recording storage: object storage + signed URLs | Accepted (partial: metadata + signed URLs) |
 | [ADR-0029](#adr-0029-trai-calling-window-0900-2100) | TRAI calling window: 09:00–21:00, enforced in dialer | Accepted (implemented) |
 | [ADR-0030](#adr-0030-mobile-kotlin-native--compose--room) | Mobile: Kotlin native + Compose + Room (supersedes ADR-0024) | Accepted (implemented) |
+| [ADR-0031](#adr-0031-runtime-api-base-derivation--cross-platform-supervision) | Web API base derived at runtime; portable launchers for systemd + launchd | Accepted (implemented) |
 
 ---
 
@@ -53,7 +54,7 @@ Index and ADR log for the OpenTeleCRM monorepo (1:1 FOSS clone of TeleCRM, telec
 - System packages: `scripts/provision/debian.sh` (PostgreSQL 16, Valkey drop-in `redis-server` for dev, build-essential, python3, ffmpeg; optional Asterisk behind `WITH_TELEPHONY=1`).
 - Pure-binary components (Meilisearch, Temporal, etc.): installed by their own scripts under `infra/native/` when enabled.
 - Database bootstrap: `scripts/db/init.sh` (idempotent role + database + extensions).
-- Process supervision: systemd units (`opentelecrm-*`), surfaced by `make status` (`systemctl --user list-units 'opentelecrm-*'`).
+- Process supervision: systemd units (`opentelecrm-*`) on Linux — surfaced by `make status` — and launchd LaunchAgents on macOS, both driving the same portable launchers (`infra/launchers/launch-{api,web}.sh`).
 - Single-command setup: `make setup` → `provision install db-init db-migrate db-seed`.
 - Ansible/Terraform/Helm directories exist under `infra/` for future fleet provisioning but remain **native-host** (no containers).
 
@@ -675,3 +676,55 @@ telephony/FGS integration — rejected).
 - − Android-only for now; iOS would be a separate native app (no RN bridge to
   reuse).
 - − F-Droid ready; Play publishing is a release decision (internal track ready).
+
+## ADR-0031: Runtime API-base derivation + cross-platform supervision
+
+**Status:** Accepted (implemented — `apps/web/src/lib/config.ts` `getApiBase()`, `infra/launchers/`, `infra/systemd/`, `infra/macos/`).
+
+**Context:** The web desk hardcoded `http://localhost:3005` as its API base,
+so any browser not on the same machine as the API (LAN device, Tailnet peer,
+Cloudflare tunnel origin) resolved `localhost` to itself and failed. Tunnel
+mode was a build-time env flip (`NEXT_PUBLIC_API_ACCESS=tunnel`) pointing at a
+single public hostname — brittle, and the origin baked into `next build`
+output. Supervision was Debian-only (systemd), with workstation-specific nvm
+paths inside the service definition.
+
+**Decision:**
+
+1. **Runtime API-base derivation** — `getApiBase()` resolves the API origin
+   from `window.location` at request time:
+   - served from `crm.srishanth.com` → `https://api.srishanth.com/autoupdate/v2`
+   - everywhere else (localhost / LAN IP / Tailnet IP / hostname) →
+     `${protocol}//${hostname}:3005/autoupdate/v2`
+   - SSR-safe fallback: env override, else `http://localhost:3005`.
+   No build-time flag; the same bundle serves every surface. CSP `connect-src`
+   and the API CORS allowlist list all four origins.
+2. **Tunnel splits web and API** — `crm.srishanth.com → :3007` (web UI),
+   `api.srishanth.com → :3005` (API). Two-level `api.crm.srishanth.com` was
+   rejected because the zone's wildcard cert (`*.srishanth.com`) does not cover
+   two-level subdomains; `api.srishanth.com` does. `scripts/tunnel.py` drives
+   DNS CNAME + ingress through the Cloudflare API.
+3. **Portable launchers, two supervisors** — `infra/launchers/launch-{api,web}.sh`
+   resolve `node` dynamically (Homebrew → nvm → PATH), source `.env`, and exec
+   without `--watch`. Linux systemd units and macOS launchd plists both point
+   at the same launchers. Provisioning: `scripts/provision/debian.sh` (Linux)
+   vs `infra/macos/provision-brew.sh` (Homebrew; no `sudo -u postgres` — the
+   login user is the superuser).
+
+**Alternatives:** Keep the env-flip tunnel mode (rejected — baked origin,
+per-surface rebuilds); reverse-proxy the API from the web origin to avoid CORS
+(rejected — couples deploys, hides the API surface); one tunnel hostname
+serving both web and API (rejected — the earlier split is cleaner and the
+wildcard-cert constraint forced `api.srishanth.com` anyway).
+
+**Consequences:**
+
+- + One bundle, every surface — LAN, Tailnet, tunnel, localhost all work with
+  zero rebuilds or env toggles.
+- + Same launchers on Linux and macOS; supervision is a thin OS wrapper.
+- + No public hostname/token in committed code — tunnel origins stay in
+  gitignored `.env` / `apps/web/.env.local`.
+- − CORS + CSP must enumerate every serving origin (four today; adding a new
+  public hostname means updating both lists).
+- − The tunnel web origin must be served over HTTPS for the API calls to stay
+  same-scheme; plain-HTTP surfaces use their own host on `:3005`.

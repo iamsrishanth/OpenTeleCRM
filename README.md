@@ -41,7 +41,7 @@ It answers the three questions every telecalling operation asks:
 
 | | |
 |---|---|
-| **🔐 Your data, your rules** | Runs on your hardware (Debian/Ubuntu, systemd, native binaries — no containers). Every table is tenant-isolated by PostgreSQL Row-Level Security, `FORCE`d so even the DB owner can't cross tenants. |
+| **🔐 Your data, your rules** | Runs on your hardware — Linux (Debian/Ubuntu, systemd) or macOS (Homebrew, launchd), native binaries, no containers. Every table is tenant-isolated by PostgreSQL Row-Level Security, `FORCE`d so even the DB owner can't cross tenants. |
 | **🔌 Wire-compatible, not look-alike** | The REST (`/autoupdate/v2`) and MCP surfaces match TeleCRM's API shapes, so existing integrations, scripts, and Postman/Bruno collections keep working — verified by a 27-request, 26-assertion Bruno collection that runs green against the live API. |
 | **📞 Live channels, not mocks** | Real WhatsApp outbound through a standalone, deploy-anywhere Baileys bridge. Real calls through a source-built Asterisk 21 PBX over ARI, with caller-ID, callbacks, and TRAI-window-aware dialer scoring. |
 
@@ -82,7 +82,7 @@ tenant-scoping discipline:
 
 ```mermaid
 flowchart LR
-    WEB[Next.js agent desk<br/>apps/web · :3000] --> API[NestJS API<br/>services/api · :3005]
+    WEB[Next.js agent desk<br/>apps/web · :3007] --> API[NestJS API<br/>services/api · :3005]
     MOB[Kotlin mobile app<br/>apps/mobile] --> API
     MCPC[MCP clients] -->|JSON-RPC /mcp| MCP[MCP server<br/>services/mcp · :3100]
     API --> DB[(PostgreSQL 16/17<br/>28 RLS-FORCE tenant tables)]
@@ -167,28 +167,57 @@ Per-phase scope + exit criteria: [docs/ROADMAP.md](docs/ROADMAP.md)
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | C4 architecture, data flow, ports |
 | [docs/PARITY.md](docs/PARITY.md) | TeleCRM parity matrix + divergences |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What's shipped / what's next (P0–P10) |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | ADR log (ADR-0001 → ADR-0030) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | ADR log (ADR-0001 → ADR-0031) |
 | [docs/RISKS.md](docs/RISKS.md) | Risk register (WhatsApp ToS, recording privacy, RLS) |
 | [docs/LICENSES.md](docs/LICENSES.md) | License posture for every component |
 | [services/whatsapp-bridge/README.md](services/whatsapp-bridge/README.md) | Deploy-anywhere WhatsApp bridge |
 | [infra/asterisk/README.md](infra/asterisk/README.md) | Asterisk 21 PBX scaffold |
+| [infra/macos/README.md](infra/macos/README.md) | Cross-platform runbook: portable launchers, systemd + launchd, brew provisioning |
 | [apps/mobile/README.md](apps/mobile/README.md) | Android client (modules, build, F-Droid) |
 
-## Tunnel mode
+## Networking & tunnel mode
 
-Optional: route the web app's API calls through a Cloudflare tunnel instead of
-`localhost:3005` — for demos or remote teams.
+The web desk resolves its API base **at runtime from the browser's own origin**
+(`apps/web/src/lib/config.ts` `getApiBase()`), so it works from every surface
+without a build-time flag:
+
+| Web UI served at | API base the browser calls |
+|------------------|----------------------------|
+| `http://localhost:3007` / `http://127.0.0.1:3007` | `http://localhost:3005/autoupdate/v2` |
+| `http://<lan-ip>:3007` | `http://<lan-ip>:3005/autoupdate/v2` |
+| `http://<tailnet-ip>:3007` or `http://<host>.ts.net:3007` | `http://<same-host>:3005/autoupdate/v2` |
+| `https://crm.srishanth.com` (Cloudflare) | `https://api.srishanth.com/autoupdate/v2` |
+
+The Cloudflare tunnel (optional — demos / remote teams) splits web and API
+onto two hostnames; both are managed by `scripts/tunnel.py` through the
+Cloudflare API:
 
 ```bash
-make tunnel      # ensure DNS CNAME + ingress, flip web app to tunnel mode
-make untunnel    # revert
+make tunnel      # ensure DNS CNAMEs + ingress: crm.srishanth.com -> :3007 (web),
+                 # api.srishanth.com -> :3005 (API); write apps/web/.env.local
+make untunnel    # revert to local mode
 ```
 
-The tunnel origin and all Cloudflare credentials live **only** in gitignored
-files (`.env`, `apps/web/.env.local`, `/etc/cloudflared/token`) — never
-committed, never printed. While the tunnel is up the API is publicly reachable,
-so never run it with production credentials, and never `next build` with tunnel
-mode active (the origin would bake into the bundle).
+Tunnel origins, zone, and all Cloudflare credentials live **only** in
+gitignored files (`.env`, `apps/web/.env.local`, `/etc/cloudflared/token`) —
+never committed, never printed. Because the API base is derived at runtime,
+no `next build` time flag or baked origin is involved — the same bundle serves
+every surface. While the tunnel is up the API is publicly reachable, so never
+run it with production credentials.
+
+## Cross-platform supervision
+
+The web + API servers are supervised identically on Linux and macOS through
+**one portable launcher pair** (`infra/launchers/launch-api.sh`,
+`infra/launchers/launch-web.sh` — resolve `node` dynamically, source `.env`,
+no watch flag):
+
+- **Linux (systemd):** `infra/systemd/opentelecrm-{api,web}.service`
+  (`sudo systemctl enable --now opentelecrm-api opentelecrm-web`).
+- **macOS (launchd):** `infra/macos/com.opentelecrm.{api,web}.plist`
+  (`launchctl load ~/Library/LaunchAgents/…`).
+
+Full runbook + portability matrix: [`infra/macos/README.md`](infra/macos/README.md).
 
 ## Contributing
 
@@ -200,7 +229,8 @@ Contributions are welcome — this is a young project and the roadmap is long.
 3. **Docs update in the same commit as the feature** — test counts, tables,
    ports, and statuses in README/PARITY/ROADMAP must not drift (see
    [docs/README.md](docs/README.md) conventions).
-4. **No Docker, ever** — native provisioners + systemd only (ADR-0001).
+4. **No Docker, ever** — native provisioners only: `scripts/provision/debian.sh`
+   on Linux, `infra/macos/provision-brew.sh` on macOS (ADR-0001).
 5. **No secrets** — `.env*`, tunnel hostnames, `*.mcp` tokens, and the mobile
    release keystore are gitignored; a PR that commits any of them will be
    rejected.
