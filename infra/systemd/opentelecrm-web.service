@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenTeleCRM Web UI (Next.js on :3007, LAN/Tailnet/tunnel)
+Wants=network-online.target opentelecrm-api.service
+After=network-online.target opentelecrm-api.service
+
+[Service]
+Type=simple
+User=sri
+Group=sri
+WorkingDirectory=/mnt/data/Projects/ByteCodeCRM/apps/web
+Environment=HOME=/home/sri
+Environment=PATH=/home/sri/.hermes/profiles/main/home/.nvm/versions/node/v22.23.1/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/sri/.hermes/profiles/main/home/.nvm/versions/node/v22.23.1/bin/node /mnt/data/Projects/ByteCodeCRM/apps/web/node_modules/next/dist/bin/next dev -p 3007 -H 0.0.0.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
