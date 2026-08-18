@@ -158,6 +158,28 @@ export class RulesController {
     return { runId };
   }
 
+  @Post(':id/webhook-secret')
+  @HttpCode(200)
+  async rotateWebhookSecret(
+    @Param('eid') eid: string,
+    @Param('id') id: string,
+    @Req() req: FastifyRequest,
+  ) {
+    assertTenant(req, eid);
+    const auth = req.auth;
+    // Generates a fresh HMAC secret for the public webhook trigger. The
+    // secret is returned ONLY here and in the create response; rotate
+    // immediately if it may have leaked.
+    const rule = await this.service.rotateWebhookSecret(eid, id, auth?.userId);
+    if (!rule) {
+      throw new HttpException(
+        { error: { code: 'AUTOMATION_NOT_FOUND', message: 'Rule not found' } },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return { data: rule, id: rule.id };
+  }
+
   @Post(':id/runs/:runId/replay')
   @HttpCode(200)
   async replay(

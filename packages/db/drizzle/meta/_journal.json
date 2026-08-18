@@ -71,6 +71,13 @@
       "when": 1786352258230,
       "tag": "0009_narrow_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787047270021,
+      "tag": "0010_yielding_landau",
+      "breakpoints": true
     }
   ]
 }

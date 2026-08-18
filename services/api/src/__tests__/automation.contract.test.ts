@@ -1,3 +1,18 @@
+import { createHmac } from 'node:crypto';
+import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  type DbClient,
+  automation,
+  automationRun,
+  automationStep,
+  callback,
+  getPool,
+  lead,
+  withTenant,
+} from '@opentelecrm/db';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
 /**
  * Contract test for the P4 automation engine (A4.x).
  *
@@ -8,21 +23,7 @@
  * telephony test owns 3107; metadata 3100; tokens 3101; sync 3102; async 3103;
  * inbox 3104).
  */
-import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import jwt from 'jsonwebtoken';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import {
-  automation,
-  automationRun,
-  automationStep,
-  callback,
-  getPool,
-  lead,
-  withTenant,
-  type DbClient,
-} from '@opentelecrm/db';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module.js';
 
 const ENTERPRISE_ID = process.env.TEST_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
@@ -63,9 +64,15 @@ async function createTeamMember(
   skills: string[] = [],
 ): Promise<{ userId: string; teamMemberId: string }> {
   // 1. ensure a role row exists.
-  let roleRow = (await withTenant(eid, async (tx) =>
-    tx.select().from((await import('@opentelecrm/db')).role).where(eq((await import('@opentelecrm/db')).role.enterpriseId, eid)).limit(1),
-  ))[0];
+  let roleRow = (
+    await withTenant(eid, async (tx) =>
+      tx
+        .select()
+        .from((await import('@opentelecrm/db')).role)
+        .where(eq((await import('@opentelecrm/db')).role.enterpriseId, eid))
+        .limit(1),
+    )
+  )[0];
   if (!roleRow) {
     const r = (await import('@opentelecrm/db')).role;
     const [created] = await withTenant(eid, async (tx) =>
@@ -216,10 +223,7 @@ describe('P4 automation engine — event-driven fire (a) lead_created + update_f
           .select()
           .from(automationRun)
           .where(
-            and(
-              eq(automationRun.enterpriseId, ENTERPRISE_ID),
-              eq(automationRun.automationId, rule.data.id),
-            ),
+            and(eq(automationRun.enterpriseId, ENTERPRISE_ID), eq(automationRun.automationId, rule.data.id)),
           )
           .orderBy(desc(automationRun.startedAt))
           .limit(1),
@@ -324,10 +328,7 @@ describe('P4 automation engine — (b) lead_stage_changed + create_callback', ()
           .select()
           .from(automationRun)
           .where(
-            and(
-              eq(automationRun.enterpriseId, ENTERPRISE_ID),
-              eq(automationRun.automationId, rule.data.id),
-            ),
+            and(eq(automationRun.enterpriseId, ENTERPRISE_ID), eq(automationRun.automationId, rule.data.id)),
           )
           .orderBy(desc(automationRun.startedAt))
           .limit(1),
@@ -371,7 +372,10 @@ describe('P4 automation engine — (c) schedule rule fires via /:id/test', () =>
         trigger: { kind: 'schedule' },
         schedule: { cron: '* * * * *' },
         actions: [
-          { kind: 'notify_user', config: { userId: '00000000-0000-0000-0000-000000000000', title: 'tick', body: 'fired' } },
+          {
+            kind: 'notify_user',
+            config: { userId: '00000000-0000-0000-0000-000000000000', title: 'tick', body: 'fired' },
+          },
         ],
       }),
     });
@@ -379,11 +383,14 @@ describe('P4 automation engine — (c) schedule rule fires via /:id/test', () =>
     const rule = (await create.json()) as { data: { id: string } };
 
     // Fire the rule via the test endpoint.
-    const testRes = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${rule.data.id}/test`, {
-      method: 'POST',
-      headers: auth(),
-      body: JSON.stringify({ payload: { firedAt: new Date().toISOString() } }),
-    });
+    const testRes = await fetch(
+      `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${rule.data.id}/test`,
+      {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({ payload: { firedAt: new Date().toISOString() } }),
+      },
+    );
     expect(testRes.status).toBe(200);
     const testBody = (await testRes.json()) as { runId: string };
     expect(testBody.runId).toBeTruthy();
@@ -394,10 +401,7 @@ describe('P4 automation engine — (c) schedule rule fires via /:id/test', () =>
 
     // The step must be kind=notify_user with the right output.
     const steps = await withTenant(ENTERPRISE_ID, async (tx) =>
-      tx
-        .select()
-        .from(automationStep)
-        .where(eq(automationStep.runId, testBody.runId)),
+      tx.select().from(automationStep).where(eq(automationStep.runId, testBody.runId)),
     );
     expect(steps.length).toBe(1);
     expect(steps[0]?.kind).toBe('notify_user');
@@ -453,7 +457,11 @@ describe('P4 automation engine — (d) lead distribution', () => {
       body: JSON.stringify({ mode: 'skill_match', skills: [skill] }),
     });
     expect(dist.status).toBe(200);
-    const distBody = (await dist.json()) as { assignedTeamMemberId: string | null; userId: string | null; reason: string };
+    const distBody = (await dist.json()) as {
+      assignedTeamMemberId: string | null;
+      userId: string | null;
+      reason: string;
+    };
     expect(distBody.assignedTeamMemberId).toBeTruthy();
     expect(distBody.userId).toBeTruthy();
     expect(distBody.reason).toBe('skill_match');
@@ -489,8 +497,16 @@ describe('P4 automation engine — (d) lead distribution', () => {
   });
 });
 
-describe('P4 automation engine — (e) webhook inbound', () => {
-  it('fires the matching webhook_received rule and writes a run row', async () => {
+describe('P4 automation engine — (e) webhook inbound (HMAC-authenticated)', () => {
+  // Message to sign: tenantId + "\n" + name + "\n" + JSON.stringify(body)
+  // (identical serialization to the controller's verification side).
+  function webhookSignature(secret: string, tenantId: string, name: string, body: unknown): string {
+    const hmac = createHmac('sha256', secret);
+    hmac.update(`${tenantId}\n${name}\n${JSON.stringify(body)}`);
+    return `sha256=${hmac.digest('hex')}`;
+  }
+
+  it('rejects unsigned/invalid traffic, verifies signatures, and rotates secrets', async () => {
     const name = `test-rule-${Date.now()}`;
     const create = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
       method: 'POST',
@@ -499,18 +515,53 @@ describe('P4 automation engine — (e) webhook inbound', () => {
         name,
         trigger: { kind: 'webhook_received' },
         actions: [
-          { kind: 'notify_user', config: { userId: '00000000-0000-0000-0000-000000000000', title: 'wh fired', body: 'ok' } },
+          {
+            kind: 'notify_user',
+            config: { userId: '00000000-0000-0000-0000-000000000000', title: 'wh fired', body: 'ok' },
+          },
         ],
       }),
     });
     expect(create.status).toBe(201);
+    const created = (await create.json()) as { data: { id: string; webhookSecret?: string } };
+    // The create response is the ONLY place the secret is ever returned.
+    expect(created.data.webhookSecret).toBeTruthy();
 
-    // POST to the webhook — public route, no auth header. Route lives under
-    // the global prefix (app.setGlobalPrefix in main.ts), so use PREFIX.
-    const wh = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+    // The secret must not leak through list/get.
+    const list = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
+      headers: auth(),
+    });
+    expect(list.status).toBe(200);
+    const listBody = (await list.json()) as { data: Array<Record<string, unknown>> };
+    const listed = listBody.data.find((r) => r.id === created.data.id);
+    expect(listed).toBeTruthy();
+    expect('webhookSecret' in listed!).toBe(false);
+
+    // POST to the webhook — public route, but the HMAC signature is required.
+    const body = { payload: { foo: 1 } };
+
+    // No signature → 401.
+    const unsigned = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ payload: { foo: 1 } }),
+      body: JSON.stringify(body),
+    });
+    expect(unsigned.status).toBe(401);
+
+    // Wrong signature → 401.
+    const wrong = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ot-signature': `sha256=${'0'.repeat(64)}` },
+      body: JSON.stringify(body),
+    });
+    expect(wrong.status).toBe(401);
+
+    // Correct signature → fires.
+    const good = webhookSignature(created.data.webhookSecret!, ENTERPRISE_ID, name, body);
+    const wh = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ot-signature': good },
+      body: JSON.stringify(body),
     });
     expect(wh.status).toBe(201);
     const whBody = (await wh.json()) as { runId: string };
@@ -519,20 +570,36 @@ describe('P4 automation engine — (e) webhook inbound', () => {
     const result = await waitForRunStatus(ENTERPRISE_ID, whBody.runId, ['success', 'failed']);
     expect(result.status).toBe('success');
 
-    // Cleanup.
-    const found = await withTenant(ENTERPRISE_ID, async (tx) =>
-      tx
-        .select()
-        .from(automation)
-        .where(and(eq(automation.enterpriseId, ENTERPRISE_ID), eq(automation.name, name)))
-        .limit(1),
+    // Rotate: old signature stops working, the new one fires.
+    const rot = await fetch(
+      `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/webhook-secret`,
+      { method: 'POST', headers: auth() },
     );
-    if (found[0]) {
-      await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${found[0].id}`, {
-        method: 'DELETE',
-        headers: auth(),
-      });
-    }
+    expect(rot.status).toBe(200);
+    const rotBody = (await rot.json()) as { data: { webhookSecret?: string } };
+    expect(rotBody.data.webhookSecret).toBeTruthy();
+    expect(rotBody.data.webhookSecret).not.toBe(created.data.webhookSecret);
+
+    const stale = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ot-signature': good },
+      body: JSON.stringify(body),
+    });
+    expect(stale.status).toBe(401);
+
+    const fresh = webhookSignature(rotBody.data.webhookSecret!, ENTERPRISE_ID, name, body);
+    const wh2 = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ot-signature': fresh },
+      body: JSON.stringify(body),
+    });
+    expect(wh2.status).toBe(201);
+
+    // Cleanup.
+    await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}`, {
+      method: 'DELETE',
+      headers: auth(),
+    });
   });
 });
 
@@ -548,9 +615,12 @@ describe('P4 automation engine — (f) tenant isolation', () => {
     // Try to fetch one of those rules with a B-scoped JWT.
     if (listABody.data.length > 0) {
       const target = listABody.data[0]!;
-      const attempt = await fetch(`${base}${PREFIX}/enterprise/${OTHER_ENTERPRISE_ID}/automations/${target.id}`, {
-        headers: auth(OTHER_ENTERPRISE_ID),
-      });
+      const attempt = await fetch(
+        `${base}${PREFIX}/enterprise/${OTHER_ENTERPRISE_ID}/automations/${target.id}`,
+        {
+          headers: auth(OTHER_ENTERPRISE_ID),
+        },
+      );
       // Either 404 (rule not found in B's tenant) or thrown enterprise-mismatch.
       // The controller calls assertTenant which throws 500 — but the auth
       // check is asserted server-side. Either is a pass.
@@ -586,9 +656,12 @@ describe('P4 automation engine — (g) run history endpoint', () => {
     const fired = (await testFire.json()) as { runId: string };
     expect(fired.runId).toBeTruthy();
 
-    const runs = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/runs`, {
-      headers: auth(),
-    });
+    const runs = await fetch(
+      `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/runs`,
+      {
+        headers: auth(),
+      },
+    );
     expect(runs.status).toBe(200);
     const runsBody = (await runs.json()) as {
       data: Array<{ id: string; status: string; startedAt: string; stepsExecuted: number }>;
@@ -648,20 +721,16 @@ describe('P4 automation engine — (h) P4b executors + replay (Wave 2)', () => {
   }
 
   it('branch(condition false, stopChainOnFalse) halts the remaining actions', async () => {
-    const id = await createRule(
-      `contract-${Date.now()}-branch`,
-      { kind: 'lead_created', config: {} },
-      [
-        {
-          kind: 'branch',
-          config: {
-            condition: { combinator: 'and', children: [{ field: 'triggered', op: 'eq', value: 'yes' }] },
-            stopChainOnFalse: true,
-          },
+    const id = await createRule(`contract-${Date.now()}-branch`, { kind: 'lead_created', config: {} }, [
+      {
+        kind: 'branch',
+        config: {
+          condition: { combinator: 'and', children: [{ field: 'triggered', op: 'eq', value: 'yes' }] },
+          stopChainOnFalse: true,
         },
-        { kind: 'update_field', config: { apiName: 'score', value: 99 } },
-      ],
-    );
+      },
+      { kind: 'update_field', config: { apiName: 'score', value: 99 } },
+    ]);
     try {
       const runId = await testFire(id, { triggered: 'no' });
       const res = await waitForRunStatus(ENTERPRISE_ID, runId, ['success', 'failed']);
@@ -674,14 +743,10 @@ describe('P4 automation engine — (h) P4b executors + replay (Wave 2)', () => {
   });
 
   it('delay + http_request executors run in-chain and hit the local health endpoint', async () => {
-    const id = await createRule(
-      `contract-${Date.now()}-delayhttp`,
-      { kind: 'lead_created', config: {} },
-      [
-        { kind: 'delay', config: { ms: 10 } },
-        { kind: 'http_request', config: { url: `http://127.0.0.1:${PORT}/health`, method: 'GET' } },
-      ],
-    );
+    const id = await createRule(`contract-${Date.now()}-delayhttp`, { kind: 'lead_created', config: {} }, [
+      { kind: 'delay', config: { ms: 10 } },
+      { kind: 'http_request', config: { url: `http://127.0.0.1:${PORT}/health`, method: 'GET' } },
+    ]);
     try {
       const runId = await testFire(id, {});
       const res = await waitForRunStatus(ENTERPRISE_ID, runId, ['success', 'failed']);
@@ -706,11 +771,9 @@ describe('P4 automation engine — (h) P4b executors + replay (Wave 2)', () => {
   });
 
   it('POST /:id/runs/:runId/replay re-fires the rule into a new run', async () => {
-    const id = await createRule(
-      `contract-${Date.now()}-replay`,
-      { kind: 'lead_created', config: {} },
-      [{ kind: 'update_field', config: { apiName: 'score', value: 5 } }],
-    );
+    const id = await createRule(`contract-${Date.now()}-replay`, { kind: 'lead_created', config: {} }, [
+      { kind: 'update_field', config: { apiName: 'score', value: 5 } },
+    ]);
     try {
       const firstRun = await testFire(id, {});
       await waitForRunStatus(ENTERPRISE_ID, firstRun, ['success', 'failed']);

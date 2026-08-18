@@ -10,18 +10,8 @@
  *   automation_run   — one execution of a workflow, traced to a trigger.
  *   automation_step  — per-action record inside a run (granular audit).
  */
-import {
-  boolean,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
-import { lead, user, enterprise } from './schema.js';
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { enterprise, lead, user } from './schema.js';
 
 const withTimestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -57,7 +47,16 @@ export const automation = pgTable(
      */
     triggerKind: varchar('trigger_kind', { length: 32 }).notNull(),
     /** Trigger-specific config (e.g. {fieldApiName} for field-changed, {fromStageId,toStageId} for stage). */
+    /** Trigger-specific config (e.g. {fieldApiName} for field-changed, {fromStageId,toStageId} for stage). */
     triggerConfig: jsonb('trigger_config').$type<Record<string, unknown>>().default({}).notNull(),
+    /**
+     * HMAC signing secret for the public webhook trigger
+     * (`trigger_kind = 'webhook_received'`). NULL until the rule is created
+     * or rotated. The public webhook endpoint rejects any request that does
+     * not carry a valid `X-OT-Signature` over this secret (fail-closed), so
+     * webhook_received rules are inert until a secret exists.
+     */
+    webhookSecret: text('webhook_secret'),
     /** JSON predicate tree (AND/OR/leaves) evaluated against the trigger payload. */
     conditions: jsonb('conditions').$type<Record<string, unknown>>().default({}).notNull(),
     /** Ordered list of action descriptors executed by the engine. */
@@ -279,17 +278,14 @@ export type SequenceRunRow = typeof sequenceRun.$inferSelect;
  * (runs per minute) prevents runaway activity. Enforcement writes a
  * 'throttled' automation_run row so the throttle is visible in the run log.
  */
-export const automationQuota = pgTable(
-  'automation_quota',
-  {
-    enterpriseId: uuid('enterprise_id')
-      .primaryKey()
-      .references(() => enterprise.id, { onDelete: 'cascade' }),
-    /** Max automation runs per minute for the tenant. */
-    rateLimitPerMinute: integer('rate_limit_per_minute').default(60).notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-);
+export const automationQuota = pgTable('automation_quota', {
+  enterpriseId: uuid('enterprise_id')
+    .primaryKey()
+    .references(() => enterprise.id, { onDelete: 'cascade' }),
+  /** Max automation runs per minute for the tenant. */
+  rateLimitPerMinute: integer('rate_limit_per_minute').default(60).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 /** Automation + sequences tenant tables — must be RLS-enforced with the core tables. */
 export const AUTOMATION_TENANT_TABLES = [
