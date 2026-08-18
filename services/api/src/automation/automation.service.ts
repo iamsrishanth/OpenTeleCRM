@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 /**
  * Automation service — the in-process rule engine the API controller, webhook
  * controller, and scheduler all share.
@@ -21,20 +22,23 @@
  * see dispatcher.ts. Rules that match no executor kind write a 'skipped' step
  * so the test contract still sees a row.
  */
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { DbClient } from '@opentelecrm/db';
 import {
   automation,
   automationRun,
   automationStep,
 } from '@opentelecrm/db';
-import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { type SQL, and, asc, desc, eq, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
+import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { type ConditionFacts, conditionsMatch } from './conditions.js';
+import { nextCronTick } from './cron.js';
 import {
-  evaluateActionConfig,
   type ActionExecutorContext,
+  evaluateActionConfig,
 } from './dispatcher.js';
+import { AutomationMeter } from './meter.js';
 import type {
   AutomationAction,
   AutomationConditionLeaf,
@@ -48,11 +52,11 @@ import type {
   CreateRuleDto,
   UpdateRuleDto,
 } from './types.js';
-import { conditionsMatch, type ConditionFacts } from './conditions.js';
-import { nextCronTick } from './cron.js';
-import { AutomationMeter } from './meter.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
+
+/** 256-bit random hex secret for webhook HMAC signing. */
+const randomSecret = (): string => randomBytes(32).toString('hex');
 
 /** DB row → internal AutomationRule shape. */
 function rowToRule(r: typeof automation.$inferSelect): AutomationRule {
@@ -126,7 +130,12 @@ export class AutomationService implements OnModuleInit {
   // -------------------------------------------------------------------------
 
   async createRule(eid: string, dto: CreateRuleDto, actorUserId?: string): Promise<AutomationRule> {
-    const triggerSpec: AutomationTriggerSpec = dto.trigger ?? { kind: 'manual' };
+      const triggerSpec: AutomationTriggerSpec = dto.trigger ?? { kind: 'manual' };
+      // Webhook_received rules get an HMAC secret at creation; it is returned
+      // to the caller exactly once (create/rotate responses only) and is
+      // required before the public webhook endpoint will accept any request.
+      const isWebhookRule = triggerSpec.kind === 'webhook_received';
+      const webhookSecret = isWebhookRule ? randomSecret() : null;
     const nextRunAt =
       triggerSpec.kind === 'schedule' && dto.schedule
         ? (dto.schedule as { runAt?: string }).runAt
@@ -147,6 +156,7 @@ export class AutomationService implements OnModuleInit {
           conditions: (dto.conditions ?? {}) as Record<string, unknown>,
           actions: (dto.actions ?? []) as unknown as Record<string, unknown>[],
           schedule: (dto.schedule as Record<string, unknown> | null) ?? null,
+          ...(webhookSecret ? { webhookSecret } : {}),
           ownerUserId: actorUserId && isUuid(actorUserId) ? actorUserId : null,
           assignmentScope: dto.assignmentScope ?? null,
           isActive: dto.isActive ?? true,
@@ -166,8 +176,43 @@ export class AutomationService implements OnModuleInit {
       after: { name: row.name, trigger: triggerSpec.kind, actions: row.actions.length },
     });
     this.invalidate(eid);
-    return rowToRule(row);
-  }
+        const rule = rowToRule(row);
+        if (webhookSecret) rule.webhookSecret = webhookSecret;
+        return rule;
+      }
+
+      /**
+       * Generate a fresh HMAC secret for a webhook_received rule and return the
+       * rule with the new secret attached (create/rotate responses only — the
+       * secret never appears in list/get). Returns null when the rule does not
+       * exist within the tenant.
+       */
+      async rotateWebhookSecret(
+        eid: string,
+        id: string,
+        actorUserId?: string,
+      ): Promise<AutomationRule | null> {
+        const secret = randomSecret();
+        const rows = await this.withTenant(eid, async (db) =>
+          db
+            .update(automation)
+            .set({ webhookSecret: secret, updatedAt: new Date() })
+            .where(and(eq(automation.enterpriseId, eid), eq(automation.id, id)))
+            .returning(),
+        );
+        if (!rows[0]) return null;
+        await this.auditService.record({
+          enterpriseId: eid,
+          actorUserId,
+          action: 'automation.webhook_secret_rotated',
+          resourceType: 'automation',
+          resourceId: id,
+        });
+        this.invalidate(eid);
+        const rule = rowToRule(rows[0]);
+        rule.webhookSecret = secret;
+        return rule;
+      }
 
   async listRules(eid: string): Promise<AutomationRule[]> {
     const rows = await this.withTenant(eid, async (db) =>

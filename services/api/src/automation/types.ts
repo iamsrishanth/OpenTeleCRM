@@ -36,16 +36,7 @@ export interface AutomationTriggerSpec {
 
 export interface AutomationConditionLeaf {
   field: string;
-  op:
-    | 'eq'
-    | 'neq'
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'in'
-    | 'contains'
-    | 'exists';
+  op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'exists';
   value?: unknown;
 }
 
@@ -91,6 +82,13 @@ export interface AutomationRule {
   nextRunAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * HMAC signing secret for webhook_received rules. Present ONLY in the
+   * create and rotate responses — never in list/get (rowToRule omits it).
+   * Rotate any time a secret may have leaked via
+   * POST /enterprise/:eid/automations/:id/webhook-secret.
+   */
+  webhookSecret?: string;
 }
 
 export type AutomationRunStatus = 'queued' | 'running' | 'success' | 'failed' | 'skipped' | 'throttled';
@@ -112,12 +110,7 @@ export interface AutomationRun {
   durationMs: number;
 }
 
-export type AutomationStepStatus =
-  | 'pending'
-  | 'running'
-  | 'success'
-  | 'failed'
-  | 'skipped';
+export type AutomationStepStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped';
 
 export interface AutomationStep {
   id: string;

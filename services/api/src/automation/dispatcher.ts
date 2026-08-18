@@ -1,3 +1,6 @@
+import { Inject, Injectable } from '@nestjs/common';
+import type { DbClient } from '@opentelecrm/db';
+import { action, actionType, call, lead, teamMember, user } from '@opentelecrm/db';
 /**
  * Action executor registry — the dispatcher side of the P4 engine.
  *
@@ -22,14 +25,12 @@
  *                        a clear "not yet implemented" message — the
  *                        dispatch loop must keep running regardless.
  */
-import { and, count, desc, eq, gte, sql, type SQL } from 'drizzle-orm';
-import type { DbClient } from '@opentelecrm/db';
-import { action, actionType, call, lead, teamMember, user } from '@opentelecrm/db';
-import type { AutomationAction, AutomationActionKind } from './types.js';
-import { conditionsMatch, type ConditionFacts } from './conditions.js';
+import { type SQL, and, count, desc, eq, gte, sql } from 'drizzle-orm';
+import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 import { resolveCallbackDue } from '../telephony/callback-time.js';
-import { TENANT_WRAPPER, DB_PROVIDER } from '../db/database.module.js';
-import { Inject, Injectable } from '@nestjs/common';
+import { type ConditionFacts, conditionsMatch } from './conditions.js';
+import type { AutomationAction, AutomationActionKind } from './types.js';
+import { assertExternalHttpUrl } from './url-safety.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -354,8 +355,12 @@ const EXECUTORS: Record<
     // calls to external services. Best-effort: network errors surface as a
     // failed step via the normal engine path (no swallow).
     const url = String(config.url ?? '');
-    if (!url) throw new Error('http_request requires url');
-    const method = String(config.method ?? 'POST').toUpperCase();
+        if (!url) throw new Error('http_request requires url');
+        // SSRF guard (security): reject private/loopback/reserved targets and
+        // non-http(s) schemes at execution time (incl. execution-time DNS
+        // verification). Env-gated escape hatches are documented in url-safety.ts.
+        await assertExternalHttpUrl(url);
+        const method = String(config.method ?? 'POST').toUpperCase();
     const headers = (config.headers ?? {}) as Record<string, string>;
     const body = config.body !== undefined ? JSON.stringify(config.body) : undefined;
     const timeoutMs = Math.min(Number(config.timeoutMs ?? 10_000) || 10_000, 30_000);
