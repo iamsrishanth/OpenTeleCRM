@@ -6,42 +6,71 @@
  * request context and reads through withTenant(), so Postgres RLS scopes all
  * queries. No cross-tenant leakage by construction.
  *
- * Auth note: dev mode reads the enterprise from env (MCP_ENTERPRISE_ID).
- * The OAuth 2.1 + PKCE + Dynamic Client Registration gateway (Zitadel)
- * lands in the auth phase — this tool surface is transport-agnostic and
- * works behind any MCP auth layer.
+ * Auth note: dev mode reads the enterprise from env (MCP_ENTERPRISE_ID); the
+ * hardcoded demo fallback is dev-only — production refuses to boot without an
+ * explicit MCP_ENTERPRISE_ID and either MCP_BEARER_TOKEN or an explicit
+ * MCP_ALLOW_UNAUTHENTICATED=true. The OAuth 2.1 + PKCE + Dynamic Client
+ * Registration gateway (Zitadel) lands in the auth phase — this tool surface
+ * is transport-agnostic and works behind any MCP auth layer.
  *
  * Transport: Streamable HTTP (POST /mcp).
  */
 import 'dotenv/config';
+import { timingSafeEqual } from 'node:crypto';
+import http from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { z, type ZodRawShape } from 'zod';
-import { sql } from 'drizzle-orm';
 import {
-  withTenant,
-  lead,
-  leadField,
   action,
   actionType,
   enterprise,
+  lead,
+  leadField,
+  lostReason,
   pipeline,
   stage,
-  lostReason,
   teamMember,
   user,
+  withTenant,
 } from '@opentelecrm/db';
 import type { DbClient } from '@opentelecrm/db';
-import http from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
+import { sql } from 'drizzle-orm';
+import { type ZodRawShape, z } from 'zod';
 
 const PORT = Number(process.env.MCP_PORT ?? 3101);
+// Hardcoded demo fallback: dev-only. assertMCPBoot() refuses to run with it
+// under NODE_ENV=production.
 const ENTERPRISE_ID = process.env.MCP_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
+if (!process.env.MCP_ENTERPRISE_ID) {
+  console.warn('[mcp] MCP_ENTERPRISE_ID not set — using the hardcoded demo enterprise id (dev only).');
+}
 // Optional shared-secret bearer auth. When set, every MCP request must carry
 // `Authorization: Bearer <MCP_BEARER_TOKEN>` (timing-safe compare). Intended
 // for operator deployments behind a reverse proxy or direct 0.0.0.0 exposure;
 // leave unset for loopback-only / authenticated-gateway setups.
 const BEARER_TOKEN = process.env.MCP_BEARER_TOKEN ?? '';
+if (!BEARER_TOKEN) {
+  console.warn(
+    '[mcp] MCP_BEARER_TOKEN not set — MCP surface is unauthenticated. Production refuses to boot without it (or MCP_ALLOW_UNAUTHENTICATED=true).',
+  );
+}
+
+/** Fail fast on insecure MCP boot configurations. */
+function assertMCPBoot() {
+  const nodeEnv = process.env.NODE_ENV ?? 'development';
+  if (nodeEnv === 'production') {
+    if (!process.env.MCP_ENTERPRISE_ID) {
+      throw new Error(
+        'Refusing to boot MCP in production without MCP_ENTERPRISE_ID — the hardcoded demo default must not scope a production tool surface.',
+      );
+    }
+    if (!BEARER_TOKEN && process.env.MCP_ALLOW_UNAUTHENTICATED !== 'true') {
+      throw new Error(
+        'Refusing to boot MCP in production without MCP_BEARER_TOKEN — set it, or explicitly opt into an unauthenticated surface with MCP_ALLOW_UNAUTHENTICATED=true.',
+      );
+    }
+  }
+}
 
 export const server = new McpServer({
   name: 'opentelecrm',
@@ -107,7 +136,10 @@ reg('get_workspace_identity', { enterpriseId: z.string().optional() }, async () 
 reg('list_lead_fields', { includeArchived: z.boolean().optional() }, async (args) => {
   const includeArchived = Boolean(args.includeArchived);
   const fields = await tenant(async (db) =>
-    db.select().from(leadField).where(includeArchived ? undefined : sql`archived_at IS NULL`),
+    db
+      .select()
+      .from(leadField)
+      .where(includeArchived ? undefined : sql`archived_at IS NULL`),
   );
   return text(
     fields.map((f) => ({
@@ -123,9 +155,7 @@ reg('list_lead_fields', { includeArchived: z.boolean().optional() }, async (args
 
 reg('get_lead_field_schema', { apiName: z.string() }, async (args) => {
   const apiName = String(args.apiName);
-  const fields = await tenant(async (db) =>
-    db.select().from(leadField).where(sql`api_name = ${apiName}`),
-  );
+  const fields = await tenant(async (db) => db.select().from(leadField).where(sql`api_name = ${apiName}`));
   const f = fields[0];
   if (!f) return text({ error: 'field_not_found' });
   return text({ apiName: f.apiName, type: f.type, config: f.config });
@@ -194,7 +224,11 @@ reg('fetch_lead', { leadId: z.string() }, async (args) => {
 
 reg(
   'query_leads',
-  { identifier: z.string().optional(), source: z.string().optional(), limit: z.number().int().min(1).max(100).optional() },
+  {
+    identifier: z.string().optional(),
+    source: z.string().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  },
   async (args) => {
     const identifier = args.identifier ? String(args.identifier) : undefined;
     const source = args.source ? String(args.source) : undefined;
@@ -288,6 +322,7 @@ const httpServer = http.createServer(async (req: http.IncomingMessage, res: http
 // Don't auto-listen when imported by tests: vitest sets VITEST, and the
 // contract test boots its own transport on a test port against `server`.
 if (!process.env.VITEST) {
+  assertMCPBoot();
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`OpenTeleCRM MCP server listening on http://0.0.0.0:${PORT}/mcp`);
     console.log(`Enterprise scope: ${ENTERPRISE_ID}`);
