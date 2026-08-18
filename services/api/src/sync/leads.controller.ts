@@ -1,14 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpException, HttpStatus, Param, Post, Put, Query, Req } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { and, count, desc, eq, sql, type SQL } from 'drizzle-orm';
-import type { FastifyRequest } from 'fastify';
 import type { DbClient } from '@opentelecrm/db';
 import { lead, leadField } from '@opentelecrm/db';
-import type { AuthContext } from '../auth/auth.guard.js';
-import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
+import { type SQL, and, count, desc, eq, sql } from 'drizzle-orm';
+import type { FastifyRequest } from 'fastify';
 import { AuditService } from '../audit/audit.service.js';
+import type { AuthContext } from '../auth/auth.guard.js';
 import { AutomationService } from '../automation/automation.service.js';
 import { leadCreated, leadUpdated } from '../automation/events.js';
+import { DB_PROVIDER, TENANT_WRAPPER } from '../db/database.module.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -432,9 +432,13 @@ export class LeadsController {
     @Body() dto: SearchDto,
   ) {
     this.assertTenant(req, eid);
-    const skip = dto.skip ?? 0;
-    const limit = dto.limit ?? 10;
-    const whereSql = (dto.filters ?? []).map((f) => this.condition(f));
+        // Security: bound the page size so one call cannot force an unbounded
+        // result set (memory/bandwidth DoS via a giant `limit`).
+        const rawLimit = Number(dto.limit ?? 10);
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 100) : 10;
+        const rawSkip = Number(dto.skip ?? 0);
+        const skip = Number.isFinite(rawSkip) && Math.floor(rawSkip) > 0 ? Math.floor(rawSkip) : 0;
+        const whereSql = (dto.filters ?? []).map((f) => this.condition(f));
 
     return this.withTenant(eid, async (db) => {
       const [rows, totalRows] = await Promise.all([

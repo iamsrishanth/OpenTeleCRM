@@ -52,9 +52,22 @@ async function bootstrap() {
     .filter(Boolean);
   app.enableCors({ origin: corsOrigins, credentials: true });
 
+  // Baseline security headers on every response (including 4xx/5xx — Fastify's
+  // onSend hook covers error replies too): no MIME sniffing, no framing, no
+  // referrer leakage, no DNS prefetch.
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onSend', async (_req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('X-DNS-Prefetch-Control', 'off');
+  });
+
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });
-  console.log(`OpenTeleCRM API listening on http://0.0.0.0:${port} (prefix ${process.env.API_BASE_PATH ?? '/autoupdate/v2'})`);
+  console.log(
+    `OpenTeleCRM API listening on http://0.0.0.0:${port} (prefix ${process.env.API_BASE_PATH ?? '/autoupdate/v2'})`,
+  );
 }
 
 bootstrap().catch((err) => {
