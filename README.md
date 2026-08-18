@@ -71,7 +71,7 @@ rendered against the seeded demo workspace:
 | **MCP server** | 13 TeleCRM-parity tools (Streamable HTTP, RLS-scoped) — drive the CRM from Cursor, Claude, or any MCP client |
 | **WhatsApp** | Send, unified inbox with auto lead-attribution, templates, broadcasts with consent ledger, drip sequences — plus a **standalone bridge** (Baileys 7.x, own session + queue) you can deploy on any Linux box |
 | **Telephony** | Smart dialer (score + TRAI-window + DND suppression), live caller-ID, follow-up callbacks, call tracking, recordings (signed URLs) — **live calls via Asterisk ARI** |
-| **Automation** | Pure-TS rule engine, 9 event kinds, 10 action executors, lead distribution (round-robin / least-loaded / skill-match), public webhooks + replay, 60s scheduler, per-tenant quota metering, 10 seeded templates, **React Flow visual builder** |
+| **Automation** | Pure-TS rule engine, 9 event kinds, 10 action executors, lead distribution (round-robin / least-loaded / skill-match), HMAC-authenticated webhooks (X-OT-Signature) + replay, 60s scheduler, per-tenant quota metering, 10 seeded templates, **React Flow visual builder** |
 | **Web agent desk** | Next.js app: dashboard with real stats, leads (search/filter/score), dialer call pad, WhatsApp inbox, automations + builder, sequences, templates, broadcasts, callbacks, webhooks, settings |
 | **Mobile app** | Kotlin-native Android client (Compose): offline-first Room cache + outbox, caller-ID heads-up, dialer with dispositions, WhatsApp inbox, UnifiedPush, F-Droid metadata — verified on-device |
 
