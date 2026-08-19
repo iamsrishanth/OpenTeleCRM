@@ -9,6 +9,7 @@ import {
   Copy,
   ExternalLink,
   History,
+  KeyRound,
   Loader2,
   Play,
   RefreshCw,
@@ -19,6 +20,10 @@ import {
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { EmptyState, LoadingScreen } from '@/components/loading'
+import {
+  extractWebhookSecret,
+  WebhookSecretDialog,
+} from '@/components/webhook-secret-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -529,7 +534,14 @@ export default function WebhooksPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
+  const [rotatingId, setRotatingId] = useState<string | null>(null)
   const [runsTick, setRunsTick] = useState(0)
+  // One-time secret reveal state (created/rotated secrets are never retrievable).
+  const [secretReveal, setSecretReveal] = useState<{
+    label: string
+    secret: string
+    name: string
+  } | null>(null)
 
   const isWebhookRule = (r: AutomationRule) =>
     r.trigger.kind === 'inbound_message' || r.trigger.kind === 'webhook_received'
@@ -599,10 +611,51 @@ export default function WebhooksPage() {
     }
   }
 
+  async function onRotateSecret(rule: AutomationRule) {
+    setRotatingId(rule.id)
+    try {
+      const res = await api.post<unknown>(
+        `/automations/${rule.id}/webhook-secret`,
+        {},
+      )
+      const secret = extractWebhookSecret(res)
+      if (!secret) {
+        toast.error('No secret returned — only webhook_received rules have one')
+        return
+      }
+      setSecretReveal({ label: `Secret rotated for “${rule.name}”`, secret, name: rule.name })
+      toast.success('New webhook secret issued')
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Failed to rotate webhook secret',
+      )
+    } finally {
+      setRotatingId(null)
+    }
+  }
+
   if (!isReady || !token) return <LoadingScreen label="Checking session…" />
 
-  const webhookUrl = `${PUBLIC_BASE}/webhook/${enterpriseId}/<name>`
-  const curlExample = `curl -X POST ${webhookUrl} -H 'content-type: application/json' -d '{"hello":"world"}'`
+  // The public webhook endpoint lives under the global API prefix
+  // (/autoupdate/v2 — the ONLY exclusions are /health).
+  const webhookBase = `${PUBLIC_BASE}/autoupdate/v2`
+  const webhookUrl = `${webhookBase}/webhook/${enterpriseId}/<name>`
+  // Signed curl template: the sender computes HMAC over
+  // `<tenantId>\n<name>\n<ts>\n<rawBody>` and sends the timestamp alongside.
+  // Fill SECRET from the create/rotate reveal (websocket-secret dialog).
+  const curlExample = [
+    `SECRET='<replace-with-rule-secret>'`,
+    `EID=${enterpriseId}`,
+    `NAME='<replace-with-rule-name>'`,
+    `TS=$(date +%s)`,
+    `BODY='{"hello":"world"}'`,
+    `SIG=$(printf '%s\\n' "$EID" "$NAME" "$TS" "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | awk '{print $NF}')`,
+    `curl -X POST ${webhookUrl} \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -H "X-OT-Timestamp: $TS" \\`,
+    `  -H "X-OT-Signature: sha256=$SIG" \\`,
+    `  -d "$BODY"`,
+  ].join('\n')
 
   return (
     <AppShell>
@@ -625,10 +678,16 @@ export default function WebhooksPage() {
             <CardDescription>
               Pattern:{' '}
               <code className="font-mono text-xs">
-                POST /webhook/{'{'}enterpriseId{'}'}/{'{'}name{'}'}
+                POST /autoupdate/v2/webhook/{'{'}enterpriseId{'}'}/{'{'}name{'}'}
               </code>{' '}
-              — the name segment is your rule&apos;s name. No authentication
-              needed; anyone with the URL can fire it.
+              — the name segment is your rule&apos;s name. Every request must
+              be HMAC-signed with the rule&apos;s secret (
+              <code className="font-mono text-[11px]">
+                X-OT-Signature
+              </code>{' '}
+              +{' '}
+              <code className="font-mono text-[11px]">X-OT-Timestamp</code>);
+              unsigned or stale requests are rejected.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -720,7 +779,7 @@ export default function WebhooksPage() {
                   </TableHeader>
                   <TableBody>
                     {rules.map((rule) => {
-                      const url = `${PUBLIC_BASE}/webhook/${enterpriseId}/${encodeURIComponent(rule.name)}`
+                      const url = `${webhookBase}/webhook/${enterpriseId}/${encodeURIComponent(rule.name)}`
                       const expanded = expandedId === rule.id
                       const triggerLabel =
                         TRIGGER_LABELS[rule.trigger.kind] ?? rule.trigger.kind
@@ -784,6 +843,23 @@ export default function WebhooksPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
+                                {rule.trigger.kind === 'webhook_received' ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={rotatingId === rule.id}
+                                    onClick={() => onRotateSecret(rule)}
+                                    title="Rotate the HMAC signing secret and reveal it once"
+                                  >
+                                    {rotatingId === rule.id ? (
+                                      <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                      <KeyRound className="size-3.5" />
+                                    )}
+                                    Secret
+                                  </Button>
+                                ) : null}
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -842,6 +918,18 @@ export default function WebhooksPage() {
             )}
           </CardContent>
         </Card>
+
+        {secretReveal ? (
+          <WebhookSecretDialog
+            open
+            onClose={() => setSecretReveal(null)}
+            label={secretReveal.label}
+            secret={secretReveal.secret}
+            tenantId={enterpriseId ?? ''}
+            name={secretReveal.name}
+            base={PUBLIC_BASE}
+          />
+        ) : null}
       </div>
     </AppShell>
   )

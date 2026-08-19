@@ -31,6 +31,7 @@ import { resolveCallbackDue } from '../telephony/callback-time.js';
 import { type ConditionFacts, conditionsMatch } from './conditions.js';
 import type { AutomationAction, AutomationActionKind } from './types.js';
 import { assertExternalHttpUrl } from './url-safety.js';
+import { signWebhook } from './webhook-signature.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -355,51 +356,143 @@ const EXECUTORS: Record<
     // calls to external services. Best-effort: network errors surface as a
     // failed step via the normal engine path (no swallow).
     const url = String(config.url ?? '');
-        if (!url) throw new Error('http_request requires url');
-        // SSRF guard (security): reject private/loopback/reserved targets and
-        // non-http(s) schemes at execution time (incl. execution-time DNS
-        // verification). Env-gated escape hatches are documented in url-safety.ts.
-        await assertExternalHttpUrl(url);
-        const method = String(config.method ?? 'POST').toUpperCase();
-    const headers = (config.headers ?? {}) as Record<string, string>;
+    if (!url) throw new Error('http_request requires url');
+    const method = String(config.method ?? 'POST').toUpperCase();
     const body = config.body !== undefined ? JSON.stringify(config.body) : undefined;
-    const timeoutMs = Math.min(Number(config.timeoutMs ?? 10_000) || 10_000, 30_000);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'content-type': 'application/json', ...headers },
-        body,
-        signal: controller.signal,
-      });
-      const text = await res.text();
-      return {
-        status: res.status,
-        ok: res.ok,
-        body: text.slice(0, 2000),
-        truncated: text.length > 2000,
-      };
-    } finally {
-      clearTimeout(timer);
+    const headers: Record<string, string> = { ...((config.headers ?? {}) as Record<string, string>) };
+    if (body !== undefined && !headers['content-type'] && !Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
+      headers['content-type'] = 'application/json';
     }
+    const timeoutMs = clampTimeout(config.timeoutMs);
+    return performExternalHttp({ url, method, headers, body, timeoutMs });
   },
 
-  // webhook action kind = outbound webhook call; same impl as http_request.
-  webhook: async (config) => {
-    const merged = { method: 'POST', ...config };
-    return EXECUTORS.http_request(merged, {
-      enterpriseId: '',
-      runId: '',
-      leadId: null,
-      lead: null,
-      payload: {},
-      correlationId: null,
-    } as ActionExecutorContext, null as unknown as ActionDispatcher);
+  // webhook action kind = outbound webhook call. When `config.webhookSecret`
+  // (and optionally tenantId/name) is set, the dispatcher signs the request
+  // as an OpenTeleCRM webhook (X-OT-Signature + X-OT-Timestamp) so calls back
+  // into this API's own webhook_received rules authenticate cleanly.
+  webhook: async (config, ctx) => {
+    const url = String(config.url ?? '');
+    if (!url) throw new Error('webhook requires url');
+    const method = String(config.method ?? 'POST').toUpperCase();
+    const body = config.body !== undefined ? JSON.stringify(config.body) : undefined;
+    const headers: Record<string, string> = { ...((config.headers ?? {}) as Record<string, string>) };
+    if (body !== undefined && !Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
+      headers['content-type'] = 'application/json';
+    }
+    const secret =
+      typeof config.webhookSecret === 'string' && config.webhookSecret.length > 0
+        ? config.webhookSecret
+        : null;
+    if (secret) {
+      const tenantId = String(config.tenantId ?? ctx.enterpriseId ?? '');
+      const name = String(config.name ?? (url.split('/').filter(Boolean).pop() ?? ''));
+      const timestamp = Math.floor(Date.now() / 1000);
+      headers['x-ot-timestamp'] = String(timestamp);
+      headers['x-ot-signature'] = signWebhook({
+        secret,
+        tenantId,
+        name,
+        timestamp,
+        body: body ?? '',
+      });
+    }
+    const timeoutMs = clampTimeout(config.timeoutMs);
+    const out = await performExternalHttp({ url, method, headers, body, timeoutMs });
+    if (!secret && out.status === 401) {
+      return {
+        ...out,
+        hint:
+          'Target returned 401 — webhook_received rules require X-OT-Signature. ' +
+          'Set config.webhookSecret (plus tenantId if it differs from the rule tenant) to have the dispatcher sign this request.',
+      };
+    }
+    return out;
   },
 
   send_email: async () => ({ skipped: true, reason: 'not yet implemented (no SMTP infra yet)' }),
 };
+
+// ---------------------------------------------------------------------------
+// Shared outbound HTTP helper (SSRF-guarded, redirect-revalidating)
+// ---------------------------------------------------------------------------
+
+const MAX_REDIRECTS = 5;
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+function clampTimeout(raw: unknown): number {
+  return Math.min(Number(raw ?? DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS, 30_000);
+}
+
+/**
+ * Executes one outbound HTTP call with:
+ *   - execution-time SSRF guard on EVERY URL (initial + each redirect hop —
+ *     a public URL that 302s to a private address is rejected, closing the
+ *     classic guard-bypass; see url-safety.ts).
+ *   - redirect:'manual' with relative Location resolution and a bounded
+ *     hop count; 301/302/303 become GET (body dropped), 307/308 keep the
+ *     method+body.
+ *   - a per-hop timeout via AbortController.
+ */
+async function performExternalHttp(opts: {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  timeoutMs: number;
+}): Promise<Record<string, unknown>> {
+  let currentUrl = opts.url;
+  let method = opts.method;
+  let headers = { ...opts.headers };
+  let body = opts.body;
+
+  for (let hop = 0; ; hop++) {
+    await assertExternalHttpUrl(currentUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(currentUrl, {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const status = res.status;
+    const location = res.headers.get('location');
+    const isRedirect =
+      (status === 301 || status === 302 || status === 303 || status === 307 || status === 308) &&
+      location !== null;
+    if (isRedirect) {
+      if (hop >= MAX_REDIRECTS) {
+        throw new Error(`http_request: too many redirects (max ${MAX_REDIRECTS}) for '${opts.url}'`);
+      }
+      // Resolve relative Location against the current URL; the guard re-runs
+      // on the next loop iteration before any fetch.
+      currentUrl = new URL(location, currentUrl).href;
+      if (status === 301 || status === 302 || status === 303) {
+        method = 'GET';
+        body = undefined;
+        headers = { accept: 'application/json' };
+      }
+      continue;
+    }
+
+    const text = await res.text();
+    return {
+      status,
+      ok: res.ok,
+      body: text.slice(0, 2000),
+      truncated: text.length > 2000,
+      redirects: hop,
+    };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public entry used by AutomationService

@@ -173,7 +173,9 @@ Components, by function:
   `GET /health`, excluded from the global prefix.
 
 **Global path prefix**: `API_BASE_PATH` defaults to `/autoupdate/v2`
-(`/health`, `/webhook/:tenantId/:name`, `/auth/*` excluded) — TeleCRM sync-API parity.
+(`/health` is the only excluded route — the public webhook endpoints
+`/webhook/:tenantId/:name` live UNDER the prefix: `POST /autoupdate/v2/webhook/...`)
+— TeleCRM sync-API parity.
 
 ### MCP server (`services/mcp`)
 

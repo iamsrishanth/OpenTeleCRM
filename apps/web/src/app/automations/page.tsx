@@ -17,6 +17,10 @@ import {
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { EmptyState, LoadingScreen } from '@/components/loading'
+import {
+  extractWebhookSecret,
+  WebhookSecretDialog,
+} from '@/components/webhook-secret-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
@@ -45,6 +49,7 @@ import {
 } from '@/components/ui/tabs'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { PUBLIC_BASE } from '@/lib/config'
 import { asList, type AutomationAction, type AutomationRule } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -294,6 +299,13 @@ export default function AutomationsPage() {
   const [useSchedule, setUseSchedule] = useState(false)
   const [cron, setCron] = useState('0 9 * * *')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  // One-time webhook secret reveal (webhook_received creates return the
+  // HMAC secret exactly once — never retrievable later).
+  const [secretReveal, setSecretReveal] = useState<{
+    label: string
+    secret: string
+    name: string
+  } | null>(null)
 
   // Drip-sequence dialog state
   const [dripOpen, setDripOpen] = useState(false)
@@ -401,10 +413,18 @@ export default function AutomationsPage() {
       if (useSchedule && cron.trim()) {
         payload.schedule = { cron: cron.trim() }
       }
-      await api.post('/automations', payload)
+      const res = await api.post<unknown>('/automations', payload)
+      const webhookSecret = extractWebhookSecret(res)
       setOpen(false)
       resetForm()
-      toast.success('Automation created')
+      toast.success(webhookSecret ? 'Automation created — save the webhook secret' : 'Automation created')
+      if (webhookSecret) {
+        setSecretReveal({
+          label: `Webhook secret for “${name.trim()}” (shown once)`,
+          secret: webhookSecret,
+          name: name.trim(),
+        })
+      }
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create automation')
@@ -1047,6 +1067,18 @@ export default function AutomationsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {secretReveal ? (
+        <WebhookSecretDialog
+          open
+          onClose={() => setSecretReveal(null)}
+          label={secretReveal.label}
+          secret={secretReveal.secret}
+          tenantId={enterpriseId ?? ''}
+          name={secretReveal.name}
+          base={PUBLIC_BASE}
+        />
+      ) : null}
     </AppShell>
   )
 }

@@ -84,7 +84,7 @@ export default function CallbacksPage() {
     try {
       const [cbData, leadData] = await Promise.all([
         api.get<unknown>(`/callbacks${dueOnly ? '?due=true' : ''}`),
-        api.get<unknown>('/leads?limit=200').catch(() => ({ data: [] })),
+        api.get<unknown>('/leads?limit=100').catch(() => ({ data: [] })),
       ])
       setCallbacks(asList<Callback>(cbData))
       setLeads(asList<Lead>(leadData))

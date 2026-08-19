@@ -167,6 +167,26 @@ export class RulesController {
   ) {
     assertTenant(req, eid);
     const auth = req.auth;
+    // Rotation only applies to webhook_received rules — a secret on any other
+    // trigger kind is meaningless and its presence would be surprising.
+    const existing = await this.service.getRule(eid, id);
+    if (!existing) {
+      throw new HttpException(
+        { error: { code: 'AUTOMATION_NOT_FOUND', message: 'Rule not found' } },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (existing.trigger.kind !== 'webhook_received') {
+      throw new HttpException(
+        {
+          error: {
+            code: 'NOT_WEBHOOK_RULE',
+            message: 'Webhook secrets only apply to rules with trigger kind webhook_received',
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     // Generates a fresh HMAC secret for the public webhook trigger. The
     // secret is returned ONLY here and in the create response; rotate
     // immediately if it may have leaked.

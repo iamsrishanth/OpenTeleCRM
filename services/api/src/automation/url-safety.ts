@@ -17,10 +17,19 @@
  *
  * Documented escape hatches (env-gated; see .env.example):
  *   AUTOMATION_URL_ALLOWLIST      comma-separated origins that bypass the
- *                                 private-range reject (exact origin match:
- *                                 scheme://host[:port]).
+ *                                 private-range reject (entries are normalized
+ *                                 to scheme://host[:port]; a host without a
+ *                                 scheme is treated as http). NOTE: an
+ *                                 allowlisted HOSTNAME also skips execution-time
+ *                                 DNS verification — you are declaring the
+ *                                 target trusted, so only allowlist origins you
+ *                                 control (see L4 in url-safety review).
  *   AUTOMATION_ALLOW_PRIVATE_IPS  'true' disables the private/IP rejection
  *                                 entirely (self-hosted intranet).
+ *
+ * Redirects: the dispatcher uses redirect:'manual' and re-runs this guard on
+ * every Location hop (services/api/src/automation/dispatcher.ts), so a 302 to
+ * an internal address is still rejected.
  *
  * Known residual risk: classic DNS-rebinding TOCTOU — a hostile public name
  * that returns a public address to THIS lookup but a private address to the
@@ -42,7 +51,11 @@ const PRIVATE_V4_RANGES: Array<[number, number]> = [
   [0xa9fe0000, 16], // 169.254.0.0/16 (link-local)
   [0xc0a80000, 16], // 192.168.0.0/16
   [0xc0000000, 24], // 192.0.0.0/24 (IETF protocol assignments)
+  [0xc0000200, 24], // 192.0.2.0/24 (TEST-NET-1, RFC 5737)
+  [0xc0586300, 24], // 192.88.99.0/24 (6to4 relay anycast, RFC 3068)
   [0xc6120000, 15], // 198.18.0.0/15 (benchmarking)
+  [0xc6336400, 24], // 198.51.100.0/24 (TEST-NET-2, RFC 5737)
+  [0xcb007100, 24], // 203.0.113.0/24 (TEST-NET-3, RFC 5737)
   [0xe0000000, 4], // 224.0.0.0/4 (multicast)
   [0xf0000000, 4], // 240.0.0.0/4 (reserved)
 ];
@@ -164,32 +177,39 @@ function isPrivateIpv6(host: string): boolean {
   });
 }
 
-const BLOCKED_HOST_SUFFIXES = [
-  'localhost',
-  'localhost.',
-  'local',
-  'local.',
-  '.localhost',
-  '.local',
-  '.internal',
-  '.home.arpa',
-  '.lan',
-];
+/** Exact single-label blocks, then dot-boundary suffixes (no substring misfires). */
+const BLOCKED_HOST_EXACT = ['localhost', 'localhost.', 'local', 'local.'];
+const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.home.arpa', '.lan'];
 
 function isBlockedHostname(host: string): boolean {
   const h = host.toLowerCase();
-  return BLOCKED_HOST_SUFFIXES.some((s) => h === s || h.endsWith(s));
+  if (BLOCKED_HOST_EXACT.includes(h)) return true;
+  return BLOCKED_HOST_SUFFIXES.some((s) => h.endsWith(s));
 }
 
+/**
+ * Parses AUTOMATION_URL_ALLOWLIST into normalized origins (scheme://host[:port]).
+ * Entries are normalized through WHATWG URL parsing so a bare host becomes
+ * http://host and trailing slashes are dropped — matching by url.origin is
+ * exact. Malformed entries are skipped (never throw on operator typos).
+ */
 function allowlistOrigins(): Set<string> | null {
   const raw = process.env.AUTOMATION_URL_ALLOWLIST;
   if (!raw || !raw.trim()) return null;
-  return new Set(
-    raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+  const set = new Set<string>();
+  for (const entry of raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)) {
+    try {
+      const u = new URL(entry.includes('://') ? entry : `http://${entry}`);
+      if (!ALLOWED_SCHEMES.has(u.protocol)) continue;
+      set.add(u.origin);
+    } catch {
+      // skip malformed entry
+    }
+  }
+  return set.size > 0 ? set : null;
 }
 
 function stripBrackets(host: string): string {

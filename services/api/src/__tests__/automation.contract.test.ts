@@ -1,4 +1,3 @@
-import { createHmac } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import {
@@ -25,6 +24,7 @@ import jwt from 'jsonwebtoken';
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../app.module.js';
+import { signWebhook } from '../automation/webhook-signature.js';
 
 const ENTERPRISE_ID = process.env.TEST_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
 const OTHER_ENTERPRISE_ID = '9811c8f1-9051-4e65-9a3e-f321ed1e209b';
@@ -38,7 +38,17 @@ const PREFIX = '/autoupdate/v2';
 
 beforeAll(async () => {
   process.env[ENV_KEY] = SECRET;
-  app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  // The automation SSRF guard blocks loopback by default; the executor
+  // contract test hits the LOCAL app, so this exact origin is allowlisted.
+  // Everything else (e.g. the private-IP rejection case) stays blocked.
+  process.env.AUTOMATION_URL_ALLOWLIST = `http://127.0.0.1:${PORT}`;
+  // Deterministic replay/rotation windows — a developer's .env must not
+  // flakily widen these.
+  process.env.WEBHOOK_MAX_SKEW_SECONDS = '300';
+  process.env.WEBHOOK_ROTATION_GRACE_SECONDS = '0';
+  // rawBody: true captures the exact request body bytes — the public webhook
+  // HMAC verifies a canonical message over the raw payload string.
+  app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), { rawBody: true });
   app.setGlobalPrefix(PREFIX, { exclude: ['/health'] });
   await app.listen({ port: PORT, host: '127.0.0.1' });
   base = `http://127.0.0.1:${PORT}`;
@@ -47,6 +57,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.close();
   await getPool().end();
+  process.env.AUTOMATION_URL_ALLOWLIST = undefined;
+  process.env.WEBHOOK_MAX_SKEW_SECONDS = undefined;
+  process.env.WEBHOOK_ROTATION_GRACE_SECONDS = undefined;
 });
 
 function devJwt(eid = ENTERPRISE_ID): string {
@@ -498,16 +511,25 @@ describe('P4 automation engine — (d) lead distribution', () => {
 });
 
 describe('P4 automation engine — (e) webhook inbound (HMAC-authenticated)', () => {
-  // Message to sign: tenantId + "\n" + name + "\n" + JSON.stringify(body)
-  // (identical serialization to the controller's verification side).
-  function webhookSignature(secret: string, tenantId: string, name: string, body: unknown): string {
-    const hmac = createHmac('sha256', secret);
-    hmac.update(`${tenantId}\n${name}\n${JSON.stringify(body)}`);
-    return `sha256=${hmac.digest('hex')}`;
+  // Message to sign: tenantId + "\n" + name + "\n" + timestamp + "\n" +
+  // rawBody (the EXACT bytes sent). signWebhook IS the canonical
+  // implementation (webhook-signature.ts), so the test can never drift from
+  // the server's verification.
+  function webhookHeaders(
+    secret: string,
+    tenantId: string,
+    name: string,
+    rawBody: string,
+    timestamp = Math.floor(Date.now() / 1000),
+  ) {
+    return {
+      'content-type': 'application/json',
+      'x-ot-timestamp': String(timestamp),
+      'x-ot-signature': signWebhook({ secret, tenantId, name, timestamp, body: rawBody }),
+    };
   }
 
-  it('rejects unsigned/invalid traffic, verifies signatures, and rotates secrets', async () => {
-    const name = `test-rule-${Date.now()}`;
+  async function createWebhookRule(name: string): Promise<{ id: string; webhookSecret: string }> {
     const create = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
       method: 'POST',
       headers: auth(),
@@ -526,6 +548,20 @@ describe('P4 automation engine — (e) webhook inbound (HMAC-authenticated)', ()
     const created = (await create.json()) as { data: { id: string; webhookSecret?: string } };
     // The create response is the ONLY place the secret is ever returned.
     expect(created.data.webhookSecret).toBeTruthy();
+    return { id: created.data.id, webhookSecret: created.data.webhookSecret! };
+  }
+
+  async function signBody(secret: string, tenantId: string, name: string, rawBody: string) {
+    return fetch(`${base}${PREFIX}/webhook/${tenantId}/${name}`, {
+      method: 'POST',
+      headers: webhookHeaders(secret, tenantId, name, rawBody),
+      body: rawBody,
+    });
+  }
+
+  it('rejects unsigned/invalid/stale traffic, verifies signatures, and rotates secrets', async () => {
+    const name = `test-rule-${Date.now()}`;
+    const { id, webhookSecret } = await createWebhookRule(name);
 
     // The secret must not leak through list/get.
     const list = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
@@ -533,36 +569,54 @@ describe('P4 automation engine — (e) webhook inbound (HMAC-authenticated)', ()
     });
     expect(list.status).toBe(200);
     const listBody = (await list.json()) as { data: Array<Record<string, unknown>> };
-    const listed = listBody.data.find((r) => r.id === created.data.id);
+    const listed = listBody.data.find((r) => r.id === id);
     expect(listed).toBeTruthy();
     expect('webhookSecret' in listed!).toBe(false);
 
     // POST to the webhook — public route, but the HMAC signature is required.
-    const body = { payload: { foo: 1 } };
+    const rawBody = JSON.stringify({ payload: { foo: 1 } });
 
     // No signature → 401.
     const unsigned = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+        'x-ot-timestamp': String(Math.floor(Date.now() / 1000)),
+      },
+      body: rawBody,
     });
     expect(unsigned.status).toBe(401);
 
     // Wrong signature → 401.
     const wrong = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-ot-signature': `sha256=${'0'.repeat(64)}` },
-      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+        'x-ot-timestamp': String(Math.floor(Date.now() / 1000)),
+        'x-ot-signature': `sha256=${'0'.repeat(64)}`,
+      },
+      body: rawBody,
     });
     expect(wrong.status).toBe(401);
+    expect(((await wrong.json()) as { error: { code: string } }).error.code).toBe(
+      'WEBHOOK_SIGNATURE_INVALID',
+    );
 
-    // Correct signature → fires.
-    const good = webhookSignature(created.data.webhookSecret!, ENTERPRISE_ID, name, body);
-    const wh = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
+    // Stale timestamp — a VALID signature over an old timestamp must be
+    // rejected (replay protection).
+    const staleTs = Math.floor(Date.now() / 1000) - 3600;
+    const stale = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-ot-signature': good },
-      body: JSON.stringify(body),
+      headers: webhookHeaders(webhookSecret, ENTERPRISE_ID, name, rawBody, staleTs),
+      body: rawBody,
     });
+    expect(stale.status).toBe(401);
+    expect(((await stale.json()) as { error: { code: string } }).error.code).toBe(
+      'WEBHOOK_TIMESTAMP_EXPIRED',
+    );
+
+    // Correct signature with a fresh timestamp → fires.
+    const wh = await signBody(webhookSecret, ENTERPRISE_ID, name, rawBody);
     expect(wh.status).toBe(201);
     const whBody = (await wh.json()) as { runId: string };
     expect(whBody.runId).toBeTruthy();
@@ -571,35 +625,91 @@ describe('P4 automation engine — (e) webhook inbound (HMAC-authenticated)', ()
     expect(result.status).toBe('success');
 
     // Rotate: old signature stops working, the new one fires.
-    const rot = await fetch(
-      `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}/webhook-secret`,
-      { method: 'POST', headers: auth() },
-    );
+    const rot = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}/webhook-secret`, {
+      method: 'POST',
+      headers: auth(),
+    });
     expect(rot.status).toBe(200);
     const rotBody = (await rot.json()) as { data: { webhookSecret?: string } };
     expect(rotBody.data.webhookSecret).toBeTruthy();
-    expect(rotBody.data.webhookSecret).not.toBe(created.data.webhookSecret);
+    expect(rotBody.data.webhookSecret).not.toBe(webhookSecret);
 
-    const stale = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-ot-signature': good },
-      body: JSON.stringify(body),
-    });
-    expect(stale.status).toBe(401);
+    const staleSig = await signBody(webhookSecret, ENTERPRISE_ID, name, rawBody);
+    expect(staleSig.status).toBe(401);
 
-    const fresh = webhookSignature(rotBody.data.webhookSecret!, ENTERPRISE_ID, name, body);
-    const wh2 = await fetch(`${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${name}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-ot-signature': fresh },
-      body: JSON.stringify(body),
-    });
-    expect(wh2.status).toBe(201);
+    const fresh = await signBody(rotBody.data.webhookSecret!, ENTERPRISE_ID, name, rawBody);
+    expect(fresh.status).toBe(201);
 
     // Cleanup.
-    await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${created.data.id}`, {
+    await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}`, {
       method: 'DELETE',
       headers: auth(),
     });
+  });
+
+  it('returns the identical 401 for an unknown rule name (no enumeration oracle)', async () => {
+    // A signed request to a rule that does not exist must produce the same
+    // error (WEBHOOK_SIGNATURE_INVALID) as a wrong signature — callers cannot
+    // probe which rule names exist.
+    const rawBody = JSON.stringify({ payload: { x: 1 } });
+    const missing = await signBody('a'.repeat(64), ENTERPRISE_ID, `no-such-rule-${Date.now()}`, rawBody);
+    expect(missing.status).toBe(401);
+    expect(((await missing.json()) as { error: { code: string } }).error.code).toBe(
+      'WEBHOOK_SIGNATURE_INVALID',
+    );
+  });
+
+  it('rejects legacy rules that have no secret yet with the identical 401', async () => {
+    // Simulate a pre-HMAC row: a webhook_received rule with no secret. It
+    // must behave exactly like a bad signature — never WEBHOOK_NOT_AUTHENTICATED.
+    const name = `legacy-${Date.now()}`;
+    const [row] = await withTenant(ENTERPRISE_ID, async (tx) =>
+      tx
+        .insert(automation)
+        .values({
+          enterpriseId: ENTERPRISE_ID,
+          name,
+          triggerKind: 'webhook_received',
+          triggerConfig: {},
+          conditions: {},
+          actions: [],
+          category: 'general',
+          isActive: true,
+          priority: 100,
+          coalesceWindowSec: 0,
+        } as never)
+        .returning({ id: automation.id }),
+    );
+    try {
+      const rawBody = JSON.stringify({ payload: { x: 1 } });
+      const res = await signBody('a'.repeat(64), ENTERPRISE_ID, name, rawBody);
+      expect(res.status).toBe(401);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+        'WEBHOOK_SIGNATURE_INVALID',
+      );
+    } finally {
+      if (row) {
+        await withTenant(ENTERPRISE_ID, async (tx) => tx.delete(automation).where(eq(automation.id, row.id)));
+      }
+    }
+  });
+
+  it('verifies the RAW request bytes, not a JS re-serialization (canonical signing)', async () => {
+    // Whitespace + key order must not matter: the signer signs the exact
+    // string it sends, and the server verifies those exact bytes. If the
+    // server re-serialized the parsed body, this signature would not match.
+    const name = `canon-${Date.now()}`;
+    const { id, webhookSecret } = await createWebhookRule(name);
+    const rawBody = '  { "payload": { "foo": 1 , "bar": 2 } }  ';
+    try {
+      const res = await signBody(webhookSecret, ENTERPRISE_ID, name, rawBody);
+      expect(res.status).toBe(201);
+    } finally {
+      await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${id}`, {
+        method: 'DELETE',
+        headers: auth(),
+      });
+    }
   });
 });
 
@@ -767,6 +877,103 @@ describe('P4 automation engine — (h) P4b executors + replay (Wave 2)', () => {
       expect((delayStep!.output as { sleptMs?: number }).sleptMs).toBeGreaterThanOrEqual(10);
     } finally {
       await deleteRule(id);
+    }
+  });
+
+  it('http_request fails closed when the target is private (SSRF guard)', async () => {
+    const id = await createRule(`contract-${Date.now()}-ssrf`, { kind: 'lead_created', config: {} }, [
+      // Link-local IMDS address — NOT in the test allowlist, so the guard must
+      // reject it at execution time before any fetch is attempted.
+      { kind: 'http_request', config: { url: 'http://169.254.169.254/latest/meta-data/', method: 'GET' } },
+    ]);
+    try {
+      const runId = await testFire(id, {});
+      const res = await waitForRunStatus(ENTERPRISE_ID, runId, ['success', 'failed']);
+      expect(res.status).toBe('failed');
+      expect(res.error ?? '').toMatch(/not allowed|blocked|resolv|private/i);
+    } finally {
+      await deleteRule(id);
+    }
+  });
+
+  it('outbound webhook action signs the request so it can call back into the API', async () => {
+    const targetName = `wh-target-${Date.now()}`;
+    const senderName = `wh-sender-${Date.now()}`;
+
+    // Target: a webhook_received rule whose secret the sender uses to sign.
+    const create = await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations`, {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({
+        name: targetName,
+        trigger: { kind: 'webhook_received' },
+        actions: [
+          {
+            kind: 'notify_user',
+            config: {
+              userId: '00000000-0000-0000-0000-000000000000',
+              title: 'inbound',
+              body: 'via outbound webhook action',
+            },
+          },
+        ],
+      }),
+    });
+    expect(create.status).toBe(201);
+    const created = (await create.json()) as { data: { id: string; webhookSecret?: string } };
+    expect(created.data.webhookSecret).toBeTruthy();
+    const targetId = created.data.id;
+    const targetSecret = created.data.webhookSecret!;
+
+    // Sender: a lead_created rule whose webhook action points at the target
+    // URL and signs with the target's secret (the dispatcher adds
+    // X-OT-Signature + X-OT-Timestamp, so the target authenticates).
+    const senderId = await createRule(senderName, { kind: 'lead_created', config: {} }, [
+      {
+        kind: 'webhook',
+        config: {
+          url: `${base}${PREFIX}/webhook/${ENTERPRISE_ID}/${targetName}`,
+          webhookSecret: targetSecret,
+          body: { ping: 'pong' },
+        },
+      },
+    ]);
+
+    try {
+      // Fire the sender; its webhook step should succeed (target returns 201).
+      const sendRun = await testFire(senderId, {});
+      const sendRes = await waitForRunStatus(ENTERPRISE_ID, sendRun, ['success', 'failed']);
+      expect(sendRes.status).toBe('success');
+      const senderSteps = await withTenant(ENTERPRISE_ID, async (tx) =>
+        tx.select().from(automationStep).where(eq(automationStep.runId, sendRun)),
+      );
+      const webhookStep = senderSteps[0]!;
+      expect(webhookStep.kind).toBe('webhook');
+      expect((webhookStep.output as { status?: number }).status).toBe(201);
+
+      // The target fired: it should now have a run that succeeds.
+      const start = Date.now();
+      let targetRunFound: { status: string } | null = null;
+      while (Date.now() - start < 3000) {
+        const runs = await fetch(
+          `${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${targetId}/runs`,
+          { headers: auth() },
+        );
+        const runsBody = (await runs.json()) as { data: { status: string }[] };
+        if (runsBody.data.length > 0) {
+          targetRunFound = runsBody.data[0]!;
+          if (runsBody.data[0]!.status === 'success' || runsBody.data[0]!.status === 'failed') break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      expect(targetRunFound).toBeTruthy();
+      expect(targetRunFound!.status).toBe('success');
+    } finally {
+      await deleteRule(senderId);
+      await fetch(`${base}${PREFIX}/enterprise/${ENTERPRISE_ID}/automations/${targetId}`, {
+        method: 'DELETE',
+        headers: auth(),
+      });
     }
   });
 
