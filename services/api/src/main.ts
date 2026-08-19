@@ -30,6 +30,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ logger: process.env.LOG_LEVEL === 'debug' }),
+    // Capture the exact request body bytes (req.rawBody) so the public
+    // webhook HMAC verifies a canonical message over the raw payload string,
+    // not a JS re-serialization (see automation/webhook-signature.ts).
+    { rawBody: true },
   );
 
   // The public sync API base path is /autoupdate/v2 (TeleCRM parity).

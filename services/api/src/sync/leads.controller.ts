@@ -436,8 +436,13 @@ export class LeadsController {
         // result set (memory/bandwidth DoS via a giant `limit`).
         const rawLimit = Number(dto.limit ?? 10);
         const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 100) : 10;
+        // Skip is bounded too: deep pagination past 100k rows is a memory/
+        // bandwidth cost with no product value. NaN/negative → 0.
         const rawSkip = Number(dto.skip ?? 0);
-        const skip = Number.isFinite(rawSkip) && Math.floor(rawSkip) > 0 ? Math.floor(rawSkip) : 0;
+        const skip =
+          Number.isFinite(rawSkip) && Math.floor(rawSkip) > 0
+            ? Math.min(Math.floor(rawSkip), 100_000)
+            : 0;
         const whereSql = (dto.filters ?? []).map((f) => this.condition(f));
 
     return this.withTenant(eid, async (db) => {
@@ -485,8 +490,15 @@ export class LeadsListController {
     if (!auth) throw new Error('unauthenticated');
     if (auth.enterpriseId !== eid) throw new Error('enterprise mismatch');
 
-    const skipN = Number(skip ?? 0);
-    const limitN = Math.min(Math.max(Number(limit ?? 50), 1), 100);
+    // Same clamps as the search surface: non-numeric/negative values fall
+    // back to defaults instead of propagating NaN into SQL offset/limit.
+    const skipN = Number.isFinite(Number(skip)) && Number(skip) >= 0
+      ? Math.floor(Number(skip))
+      : 0;
+    const limitN = Math.min(
+      Math.max(Number.isFinite(Number(limit)) ? Math.floor(Number(limit)) : 50, 1),
+      100,
+    );
 
     const { rows, total } = await this.withTenant(eid, async (db) => {
       const [rows, totalRows] = await Promise.all([

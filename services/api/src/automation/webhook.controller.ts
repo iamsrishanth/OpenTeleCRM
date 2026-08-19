@@ -1,24 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-/**
- * Public webhook ingress (A4.1 + P4). Triggers automation rules whose
- * trigger.kind='webhook_received' and whose name matches the slug's name
- * part. Slug format: '{tenantId}/{name}'. The route is @Public() — the HMAC
- * signature IS the authentication (see below), not a session.
- *
- * AUTHENTICATION (fail-closed):
- *   Every request MUST carry an `X-OT-Signature: sha256=<hex>` header.
- *   The signature is hex(HMAC-SHA256(webhook_secret, message)) where
- *     message = tenantId + "\n" + name + "\n" + JSON.stringify(body)
- *   and `body` is the exact JSON object sent in the request body.
- *   The webhook_secret is generated at rule creation and exposed ONLY in the
- *   create/rotate responses (POST /enterprise/:eid/automations,
- *   POST /enterprise/:eid/automations/:id/webhook-secret). It is never
- *   returned by list/get.
- *
- *   Rules that have no secret yet (legacy rows) reject ALL requests — they
- *   must be rotated to become active. This intentionally reverses the old
- *   permissive behavior (any caller could fire any known rule name).
- */
 import {
   Body,
   Controller,
@@ -36,12 +15,45 @@ import type { FastifyRequest } from 'fastify';
 import { Public } from '../auth/public.decorator.js';
 import { TENANT_WRAPPER } from '../db/database.module.js';
 import { AutomationService } from './automation.service.js';
+import {
+  DUMMY_SECRET,
+  SIGNATURE_HEADER,
+  parseTimestamp,
+  rotatedSecretCandidates,
+  timestampInWindow,
+  verifySignature,
+} from './webhook-signature.js';
 
+/**
+ * Public webhook ingress (A4.1 + P4). Triggers automation rules whose
+ * trigger.kind='webhook_received' and whose name matches the slug's name
+ * part. Slug format: '{tenantId}/{name}'. The route is @Public() — the HMAC
+ * signature IS the authentication (see below), not a session.
+ *
+ * AUTHENTICATION (fail-closed, canonical, replay-protected):
+ *   Every request MUST carry:
+ *     X-OT-Timestamp   unix seconds (integer) — signed + window-checked
+ *     X-OT-Signature   sha256=<hex> = hex(HMAC-SHA256(webhook_secret,
+ *                          tenantId + "\n" + name + "\n" + timestamp + "\n"
+ *                          + rawBody))
+ *   where rawBody is the EXACT request body bytes sent (UTF-8). Sign the raw
+ *   bytes — not a re-serialization — so non-JS signers never hit key-order /
+ *   number-format mismatches. Full spec + helpers: webhook-signature.ts.
+ *
+ *   The webhook_secret is generated at rule creation and exposed ONLY in the
+ *   create/rotate responses (POST /enterprise/:eid/automations,
+ *   POST /enterprise/:eid/automations/:id/webhook-secret). It is never
+ *   returned by list/get.
+ *
+ *   Missing rules and secret-less (legacy) rules return the SAME 401 as a
+ *   bad signature — no name/rotation-state enumeration via status codes.
+ *
+ *   Replay window: timestamps older/newer than WEBHOOK_MAX_SKEW_SECONDS
+ *   (default 300s) are rejected after signature verification.
+ */
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIGNATURE_HEADER = 'x-ot-signature';
-const SIGNATURE_PREFIX = 'sha256=';
 
 function unauth(code: string, message: string): HttpException {
   return new HttpException({ error: { code, message } }, HttpStatus.UNAUTHORIZED);
@@ -77,14 +89,34 @@ export class WebhookController {
       );
     }
 
-    const bodyObj = body ?? {};
+    // --- Protocol-level checks (uniform; no per-rule state is revealed) ----
     const signature = (req.headers[SIGNATURE_HEADER] as string | undefined) ?? '';
     if (!signature) {
       throw unauth(
         'WEBHOOK_SIGNATURE_MISSING',
-        `Missing ${SIGNATURE_HEADER} header (format: ${SIGNATURE_PREFIX}<hex>)`,
+        `Missing ${SIGNATURE_HEADER} header (format: ${'sha256=<hex>'})`,
       );
     }
+    const timestamp = parseTimestamp(req.headers['x-ot-timestamp'] as string | undefined);
+    if (timestamp === null) {
+      throw unauth(
+        'WEBHOOK_TIMESTAMP_INVALID',
+        'Missing/invalid x-ot-timestamp header (unix seconds required; it is part of the signed message)',
+      );
+    }
+
+    // Canonical payload to verify: the EXACT bytes on the wire. Falls back to
+    // a re-serialization only when rawBody was not captured (should not
+    // happen with rawBody enabled in main.ts). `rawBody` is attached to the
+    // fastify request by the Nest adapter at runtime (not in the typed
+    // Request), so read it through an explicit shape.
+    const wireBody = (req as unknown as { rawBody?: string | unknown }).rawBody;
+    const rawBody =
+      typeof wireBody === 'string'
+        ? wireBody
+        : Buffer.isBuffer(wireBody)
+          ? wireBody.toString('utf8')
+          : JSON.stringify(body ?? {});
 
     const rule = await this.withTenant(tenantId, async (db) =>
       db
@@ -100,40 +132,33 @@ export class WebhookController {
         )
         .limit(1),
     );
-    if (!rule[0]) {
-      throw new HttpException(
-        { error: { code: 'RULE_NOT_FOUND', message: 'No matching webhook rule' } },
-        HttpStatus.NOT_FOUND,
-      );
-    }
     const r = rule[0];
+    // Uniformity (no oracle): a missing rule or a secret-less rule falls back
+    // to the dummy secret, so the response is identical to a wrong signature.
+    const candidates = [
+      r?.webhookSecret,
+      ...(r ? rotatedSecretCandidates(r.id) : []),
+    ].filter((s): s is string => Boolean(s));
+    if (candidates.length === 0) candidates.push(DUMMY_SECRET);
 
-    // Fail-closed: rules without a secret are inert until rotated.
-    if (!r.webhookSecret) {
-      throw unauth(
-        'WEBHOOK_NOT_AUTHENTICATED',
-        'This webhook rule has no signing secret. Rotate one via ' +
-          'POST /enterprise/:eid/automations/:id/webhook-secret to enable it.',
-      );
-    }
-
-    const provided = signature.startsWith(SIGNATURE_PREFIX)
-      ? signature.slice(SIGNATURE_PREFIX.length)
-      : signature;
-    if (!/^[0-9a-f]{64}$/i.test(provided)) {
-      throw unauth('WEBHOOK_SIGNATURE_INVALID', 'Signature must be sha256 hex digest');
-    }
-    const expected = createHmac('sha256', r.webhookSecret)
-      .update(`${tenantId}\n${name}\n${JSON.stringify(bodyObj)}`)
-      .digest('hex');
-    if (
-      !timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(provided, 'hex'))
-    ) {
+    const verified = candidates.some((secret) =>
+      verifySignature(secret, tenantId, name, timestamp, rawBody, signature),
+    );
+    if (!verified) {
       throw unauth('WEBHOOK_SIGNATURE_INVALID', 'Signature verification failed');
     }
 
+    // Replay window — only reachable with a genuine signature.
+    if (!timestampInWindow(timestamp)) {
+      throw unauth(
+        'WEBHOOK_TIMESTAMP_EXPIRED',
+        'Signature timestamp is outside the acceptable window (replay protection). Send with a fresh x-ot-timestamp header and re-sign.',
+      );
+    }
+
+    const bodyObj = body ?? {};
     const payload = bodyObj?.payload ?? bodyObj ?? {};
-    const runId = await this.service.testRule(tenantId, r.id, {
+    const runId = await this.service.testRule(tenantId, r!.id, {
       headers: bodyObj?.headers ?? {},
       query: bodyObj?.query ?? {},
       payload,

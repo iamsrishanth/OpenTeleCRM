@@ -19,11 +19,16 @@ import { ArrowLeft, Loader2, Save, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
 import { LoadingScreen } from '@/components/loading'
+import {
+  extractWebhookSecret,
+  WebhookSecretDialog,
+} from '@/components/webhook-secret-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { PUBLIC_BASE } from '@/lib/config'
 import type { AutomationRule } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import CanvasNode, { NodeActionsProvider } from '@/components/builder/canvas-node'
@@ -55,6 +60,13 @@ function BuilderPageInner() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  // One-time webhook secret reveal — a webhook_received create returns the
+  // HMAC secret exactly once; hold navigation until the operator saves it.
+  const [secretReveal, setSecretReveal] = useState<{
+    label: string
+    secret: string
+    name: string
+  } | null>(null)
 
   const idCounter = useRef(0)
 
@@ -205,11 +217,23 @@ function BuilderPageInner() {
       if (editId) {
         await api.patch(`/automations/${editId}`, patchPayloadFromCompiled(compiled))
         toast.success('Automation updated')
+        router.push('/automations')
       } else {
-        await api.post('/automations', compiled)
+        const res = await api.post<unknown>('/automations', compiled)
+        const webhookSecret = extractWebhookSecret(res)
+        if (webhookSecret) {
+          // Show the one-time secret BEFORE leaving the page; onClose navigates.
+          setSecretReveal({
+            label: `Webhook secret for “${name.trim()}” (shown once)`,
+            secret: webhookSecret,
+            name: name.trim(),
+          })
+          toast.success('Automation created — save the webhook secret')
+          return
+        }
         toast.success('Automation created')
+        router.push('/automations')
       }
-      router.push('/automations')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save automation')
     } finally {
@@ -389,6 +413,21 @@ function BuilderPageInner() {
           <PropertiesPanel node={selectedNode} onConfig={updateNodeConfig} onDelete={deleteNode} />
         </div>
       </div>
+
+      {secretReveal ? (
+        <WebhookSecretDialog
+          open
+          onClose={() => {
+            setSecretReveal(null)
+            router.push('/automations')
+          }}
+          label={secretReveal.label}
+          secret={secretReveal.secret}
+          tenantId={enterpriseId ?? ''}
+          name={secretReveal.name}
+          base={PUBLIC_BASE}
+        />
+      ) : null}
     </AppShell>
   )
 }

@@ -100,6 +100,57 @@ rows. Missing tenant context returns **zero rows**, not a leak.
 Full detail — C4 diagrams, data flow, ports, future containers:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
+## MCP client setup
+
+The MCP server (`services/mcp`) exposes 13 TeleCRM-parity tools over
+Streamable HTTP (`POST /mcp`, loopback bind by default). In production it
+**refuses to boot** without `MCP_ENTERPRISE_ID` and either `MCP_BEARER_TOKEN`
+or an explicit `MCP_ALLOW_UNAUTHENTICATED=true`; set `MCP_HOST=0.0.0.0` only
+when you also set a bearer token (a public bind without one is rejected).
+
+Server env (`services/mcp`):
+
+```bash
+MCP_PORT=3100
+MCP_ENTERPRISE_ID=<tenant-uuid>
+MCP_BEARER_TOKEN=<long-random-token>   # recommended
+MCP_HOST=127.0.0.1                     # default; loopback only
+```
+
+Clients that support auth-header streamable HTTP configs: Claude Desktop,
+Cursor, VS Code MCP, MCP Inspector, Continue — all use the same shape:
+
+**Claude Desktop** — `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "opentelecrm": {
+      "type": "http",
+      "url": "http://127.0.0.1:3100/mcp",
+      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    }
+  }
+}
+```
+
+**Cursor** — `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "opentelecrm": {
+      "type": "http",
+      "url": "http://127.0.0.1:3100/mcp",
+      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    }
+  }
+}
+```
+
+Point `url` at the tunnel/ingress host when the server is remote, and keep the
+bearer token out of anything you commit (`.gitignore` already covers `*.mcp`).
+
 ## Quick start
 
 **Prerequisites:** Debian/Ubuntu (or any Linux), Node.js ≥ 22 (corepack pnpm),

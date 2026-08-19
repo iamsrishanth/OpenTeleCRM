@@ -33,6 +33,14 @@ describe('assertExternalHttpUrl — public targets', () => {
   it('allows public literal IPv6', async () => {
     await expect(assertExternalHttpUrl('http://[2606:4700:4700::1111]/dns')).resolves.toBeUndefined();
   });
+
+  // L6 regression: the old 'local' suffix matched by substring, so any host
+  // ENDING in "local" was wrongly blocked. Dot-boundary matching must allow
+  // these public hosts.
+  it('allows public hosts that merely end with the "local" substring (dot-boundary)', async () => {
+    await expect(assertExternalHttpUrl('http://mylocal.github.io/x')).resolves.toBeUndefined();
+    await expect(assertExternalHttpUrl('http://www.example.com/x')).resolves.toBeUndefined();
+  });
 });
 
 describe('assertExternalHttpUrl — scheme and shape', () => {
@@ -64,7 +72,11 @@ describe('assertExternalHttpUrl — private IPv4 ranges', () => {
     'http://224.0.0.1/',
     'http://240.0.0.1/',
     'http://192.0.0.1/',
+    'http://192.0.2.15/', // TEST-NET-1 (RFC 5737)
+    'http://192.88.99.4/', // 6to4 relay anycast (RFC 3068)
     'http://198.18.0.1/',
+    'http://198.51.100.7/', // TEST-NET-2 (RFC 5737)
+    'http://203.0.113.9/', // TEST-NET-3 (RFC 5737)
     // DNS name that resolves (via public DNS) to a loopback address —
     // caught by the execution-time DNS verification.
     'http://127.0.0.1.nip.io/',

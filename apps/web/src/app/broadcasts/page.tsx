@@ -132,7 +132,7 @@ export default function BroadcastsPage() {
       const [bcData, tplData, leadData] = await Promise.all([
         api.get<unknown>('/whatsapp/broadcasts'),
         api.get<unknown>('/whatsapp/templates').catch(() => ({ data: [] })),
-        api.get<unknown>('/leads?limit=200').catch(() => ({ data: [] })),
+        api.get<unknown>('/leads?limit=100').catch(() => ({ data: [] })),
       ])
       setBroadcasts(asList<BroadcastRow>(bcData))
       setTemplates(asList<TemplateRow>(tplData))

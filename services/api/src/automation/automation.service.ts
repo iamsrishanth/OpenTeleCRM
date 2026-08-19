@@ -52,6 +52,7 @@ import type {
   CreateRuleDto,
   UpdateRuleDto,
 } from './types.js';
+import { rememberRotatedSecret } from './webhook-signature.js';
 
 type TenantFn = <T>(enterpriseId: string, fn: (db: DbClient) => Promise<T>) => Promise<T>;
 
@@ -192,6 +193,15 @@ export class AutomationService implements OnModuleInit {
         id: string,
         actorUserId?: string,
       ): Promise<AutomationRule | null> {
+        // Capture the CURRENT secret before overwriting so the rotation grace
+        // period (WEBHOOK_ROTATION_GRACE_SECONDS) can keep it valid briefly.
+        const [priorRow] = await this.withTenant(eid, async (db) =>
+          db
+            .select({ webhookSecret: automation.webhookSecret })
+            .from(automation)
+            .where(and(eq(automation.enterpriseId, eid), eq(automation.id, id)))
+            .limit(1),
+        );
         const secret = randomSecret();
         const rows = await this.withTenant(eid, async (db) =>
           db
@@ -201,6 +211,9 @@ export class AutomationService implements OnModuleInit {
             .returning(),
         );
         if (!rows[0]) return null;
+        if (priorRow?.webhookSecret) {
+          rememberRotatedSecret(id, priorRow.webhookSecret);
+        }
         await this.auditService.record({
           enterpriseId: eid,
           actorUserId,

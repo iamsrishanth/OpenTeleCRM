@@ -38,6 +38,10 @@ import { sql } from 'drizzle-orm';
 import { type ZodRawShape, z } from 'zod';
 
 const PORT = Number(process.env.MCP_PORT ?? 3101);
+// Default bind is loopback only — exposing MCP beyond the machine requires an
+// explicit MCP_HOST (e.g. MCP_HOST=0.0.0.0) AND, for non-loopback binds, a
+// bearer token (see assertMCPBoot).
+const HOST = process.env.MCP_HOST ?? '127.0.0.1';
 // Hardcoded demo fallback: dev-only. assertMCPBoot() refuses to run with it
 // under NODE_ENV=production.
 const ENTERPRISE_ID = process.env.MCP_ENTERPRISE_ID ?? 'a9e8933a-0a29-4e8b-8b2b-7fdfaf1b88d9';
@@ -58,6 +62,7 @@ if (!BEARER_TOKEN) {
 /** Fail fast on insecure MCP boot configurations. */
 function assertMCPBoot() {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
+  const isPublicBind = HOST === '0.0.0.0' || HOST === '::' || HOST === '[::]';
   if (nodeEnv === 'production') {
     if (!process.env.MCP_ENTERPRISE_ID) {
       throw new Error(
@@ -69,6 +74,15 @@ function assertMCPBoot() {
         'Refusing to boot MCP in production without MCP_BEARER_TOKEN — set it, or explicitly opt into an unauthenticated surface with MCP_ALLOW_UNAUTHENTICATED=true.',
       );
     }
+    if (isPublicBind && !BEARER_TOKEN) {
+      throw new Error(
+        'Refusing to bind MCP to 0.0.0.0 without MCP_BEARER_TOKEN — an unauthenticated internet-visible MCP surface exposes the whole tool set.',
+      );
+    }
+  } else if (isPublicBind && !BEARER_TOKEN) {
+    console.warn(
+      '[mcp] Binding to 0.0.0.0 without MCP_BEARER_TOKEN — anyone who can reach this port gets the full tool surface. Set MCP_HOST=127.0.0.1 (default) or configure MCP_BEARER_TOKEN.',
+    );
   }
 }
 
@@ -294,6 +308,13 @@ function authorized(req: http.IncomingMessage): boolean {
 }
 
 const httpServer = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
+  // Baseline security headers on every response (matches the REST API).
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('Cache-Control', 'no-store');
+
   if (req.method !== 'OPTIONS' && !authorized(req)) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.writeHead(401, { 'content-type': 'application/json' });
@@ -323,8 +344,8 @@ const httpServer = http.createServer(async (req: http.IncomingMessage, res: http
 // contract test boots its own transport on a test port against `server`.
 if (!process.env.VITEST) {
   assertMCPBoot();
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`OpenTeleCRM MCP server listening on http://0.0.0.0:${PORT}/mcp`);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`OpenTeleCRM MCP server listening on http://${HOST}:${PORT}/mcp`);
     console.log(`Enterprise scope: ${ENTERPRISE_ID}`);
   });
 }
