@@ -116,7 +116,9 @@ export class WebhookController {
         ? wireBody
         : Buffer.isBuffer(wireBody)
           ? wireBody.toString('utf8')
-          : JSON.stringify(body ?? {});
+          : body !== undefined
+            ? JSON.stringify(body)
+            : '';
 
     const rule = await this.withTenant(tenantId, async (db) =>
       db
@@ -144,6 +146,9 @@ export class WebhookController {
     const verified = candidates.some((secret) =>
       verifySignature(secret, tenantId, name, timestamp, rawBody, signature),
     );
+    // Spec-gap note: requests signed under the old (pre-timestamp) protocol
+    // will 401 here with WEBHOOK_SIGNATURE_INVALID — the replay window needs
+    // a signed timestamp. Rotate external signers to `tenantId\nname\nts\nrawBody`.
     if (!verified) {
       throw unauth('WEBHOOK_SIGNATURE_INVALID', 'Signature verification failed');
     }
