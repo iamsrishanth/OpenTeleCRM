@@ -386,7 +386,14 @@ const EXECUTORS: Record<
         : null;
     if (secret) {
       const tenantId = String(config.tenantId ?? ctx.enterpriseId ?? '');
-      const name = String(config.name ?? (url.split('/').filter(Boolean).pop() ?? ''));
+      let derivedName = '';
+      try {
+        derivedName = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() ?? '');
+      } catch {
+        derivedName = String(url.split('/').filter(Boolean).pop() ?? '').split('?')[0] ?? '';
+        try { derivedName = decodeURIComponent(derivedName); } catch { /* keep raw */ }
+      }
+      const name = String(config.name ?? derivedName);
       const timestamp = Math.floor(Date.now() / 1000);
       headers['x-ot-timestamp'] = String(timestamp);
       headers['x-ot-signature'] = signWebhook({
@@ -479,6 +486,15 @@ async function performExternalHttp(opts: {
         method = 'GET';
         body = undefined;
         headers = { accept: 'application/json' };
+      } else {
+        const nextOrigin = new URL(currentUrl).origin;
+        const baseOrigin = new URL(opts.url).origin;
+        if (nextOrigin !== baseOrigin) {
+          for (const k of Object.keys(headers)) {
+            const lk = k.toLowerCase();
+            if (lk === 'authorization' || lk === 'cookie') delete (headers as Record<string, string>)[k];
+          }
+        }
       }
       continue;
     }

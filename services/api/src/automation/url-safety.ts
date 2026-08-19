@@ -164,6 +164,9 @@ const PRIVATE_V6_PREFIXES: Array<[string, number]> = [
   ['fc00::', 7], // unique local
   ['fe80::', 10], // link-local
   ['ff00::', 8], // multicast
+  ['2001:db8::', 32], // documentation (RFC 3849)
+  ['2002::', 16], // 6to4 (RFC 3056)
+  ['64:ff9b::', 96], // NAT64 well-known prefix (RFC 6052)
 ];
 
 function isPrivateIpv6(host: string): boolean {

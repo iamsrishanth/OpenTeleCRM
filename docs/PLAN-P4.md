@@ -71,6 +71,9 @@ P4 lands the A4 automation slice: a pure-TS rule engine, rules CRUD + test runne
 - [x] MCP 15/15, telephony 13/13, whatsapp 14/14 green; root `pnpm test` exits 0
 - [x] PARITY.md A4 rows reflect final state (A4.7 ✅, D4 implemented; A1.1 ✅ live dial)
 
+### Round-2 addendum — operator migration note
+The 2026-08 webhook hardening **changes the wire protocol**: every `POST /webhook/:tenantId/:name` must now send `X-OT-Timestamp` + `X-OT-Signature` over `tenantId\nname\ntimestamp\nrawBody`. Senders that only signed `tenantId\nname\nbody` will 401 (`WEBHOOK_SIGNATURE_INVALID`/`WEBHOOK_TIMESTAMP_INVALID`). Rotate signers before deploy and keep `WEBHOOK_MAX_SKEW_SECONDS` (default 300s) and `WEBHOOK_ROTATION_GRACE_SECONDS` in sync with your signer fleet.
+
 ## Rollback
 Per-vertical-slice: pg_dump pre-migration backup; additive-only migrations (0003 is additive); automation routes sit behind the normal tenant-scoped guard — disable by not importing `AutomationModule` in `app.module.ts`; `git checkout` previous commit to revert code. No destructive migration merges.
 
