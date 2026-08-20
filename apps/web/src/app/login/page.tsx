@@ -25,7 +25,7 @@ export default function LoginPage() {
 
   // Already signed in → dashboard.
   useEffect(() => {
-    if (isReady && token) router.replace('/')
+    if (isReady && token) router.replace('/dashboard')
   }, [isReady, token, router])
 
   async function onSubmit(e: FormEvent) {
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setError(null)
     try {
       await login(eid.trim(), secret.trim())
-      router.replace('/')
+      router.replace('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed')
     } finally {

@@ -28,7 +28,7 @@ import { asList, type WhatsAppConversation } from '@/lib/types'
 import { useRole } from '@/lib/roles'
 
 const NAV = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: Users },
   { href: '/inbox', label: 'Inbox', icon: MessageSquare },
   { href: '/dialer', label: 'Dialer', icon: PhoneCall },
@@ -92,7 +92,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active =
-            href === '/' ? pathname === '/' : pathname.startsWith(href)
+            href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
           return (
             <Link
               key={href}
