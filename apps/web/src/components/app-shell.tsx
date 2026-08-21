@@ -1,10 +1,31 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar'
 import { Topnav } from '@/components/topnav'
+import { useAuth } from '@/lib/auth-context'
+import { LoadingScreen } from '@/components/loading'
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { isReady, token, enterpriseId } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isReady) return
+    if (!token || !enterpriseId) {
+      router.replace('/login')
+    }
+  }, [isReady, token, enterpriseId, router])
+
+  if (!isReady) {
+    return <LoadingScreen label="Checking authentication…" />
+  }
+
+  if (!token || !enterpriseId) {
+    return <LoadingScreen label="Redirecting to login…" />
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar />

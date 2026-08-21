@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import {
   ChevronDown,
   Building2,
@@ -47,11 +48,13 @@ import {
   LogIn,
   KeyRound,
   HeadphonesIcon,
+  LayoutDashboard,
 } from "lucide-react";
 
 const TEAM_SIZES = ["1 - 5 members", "6 - 15 members", "16 - 50 members", "50+ members"];
 
 export default function Navbar() {
+  const { isReady, token } = useAuth();
   const [showFeatures, setShowFeatures] = useState(false);
   const [showMoreFeatures, setShowMoreFeatures] = useState(false);
 
@@ -418,13 +421,23 @@ export default function Navbar() {
 
           {/* Action Call To Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-slate-700 hover:text-[#6C5CE7] font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl hover:bg-slate-50"
-            >
-              <LogIn className="w-4 h-4 text-slate-500" />
-              Login
-            </Link>
+            {isReady && token ? (
+              <Link
+                href="/dashboard"
+                className="bg-indigo-50 text-[#6C5CE7] hover:bg-indigo-100 font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl border border-indigo-200/60"
+              >
+                <LayoutDashboard className="w-4 h-4 text-[#6C5CE7]" />
+                Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="text-slate-700 hover:text-[#6C5CE7] font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl hover:bg-slate-50"
+              >
+                <LogIn className="w-4 h-4 text-slate-500" />
+                Login
+              </Link>
+            )}
 
             <button
               onClick={openDemoModal}
@@ -463,13 +476,23 @@ export default function Navbar() {
             </div>
             
             <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-              <Link
-                href="/login"
-                onClick={closeAllMenus}
-                className="w-full bg-slate-100 text-slate-800 font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
-              >
-                <LogIn className="w-4 h-4" /> Login to Portal
-              </Link>
+              {isReady && token ? (
+                <Link
+                  href="/dashboard"
+                  onClick={closeAllMenus}
+                  className="w-full bg-[#6C5CE7] text-white font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" /> Go to Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={closeAllMenus}
+                  className="w-full bg-slate-100 text-slate-800 font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" /> Login to Portal
+                </Link>
+              )}
               <button
                 onClick={openDemoModal}
                 className="w-full bg-[#6C5CE7] text-white font-extrabold py-3 rounded-xl text-xs transition shadow-md cursor-pointer flex items-center justify-center gap-2"
