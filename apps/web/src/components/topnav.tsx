@@ -11,6 +11,15 @@ const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/leads': 'Leads',
   '/inbox': 'Inbox',
+  '/dialer': 'Auto Dialer',
+  '/integrations': 'Integrations & App Store',
+  '/automations': 'Automations',
+  '/sequences': 'Sequences',
+  '/templates': 'Templates',
+  '/broadcasts': 'Broadcasts',
+  '/callbacks': 'Callbacks',
+  '/webhooks': 'Webhooks',
+  '/billing': 'Billing & Subscription Usage',
   '/settings': 'Settings',
   '/login': 'Sign in',
   '/attendance': 'Attendance',
@@ -18,7 +27,7 @@ const TITLES: Record<string, string> = {
   '/tasks': 'Tasks',
   '/reports': 'Reports',
   '/admin/departments': 'Departments',
-  '/admin/team': 'Team',
+  '/admin/team': 'Team & Telecaller Roles',
 }
 
 export function Topnav() {
