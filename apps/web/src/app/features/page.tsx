@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   PhoneCall,
   Trophy,
@@ -663,6 +664,9 @@ export default function FeaturesPage() {
           </div>
         </div>
       </main>
+
+      {/* FOOTER */}
+      <Footer />
 
       {/* POP-UP DEMO MODAL */}
       {isModalOpen && (

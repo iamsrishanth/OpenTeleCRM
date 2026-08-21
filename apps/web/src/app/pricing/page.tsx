@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   CheckCircle2,
   ChevronDown,
@@ -315,6 +316,9 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      {/* FOOTER */}
+      <Footer />
 
       {/* POP-UP DEMO MODAL */}
       {isModalOpen && (

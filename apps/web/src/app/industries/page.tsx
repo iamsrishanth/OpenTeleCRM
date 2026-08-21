@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   LucideIcon,
   Building2,
@@ -514,6 +515,9 @@ export default function IndustriesPage() {
           </div>
         </div>
       </main>
+
+      {/* FOOTER */}
+      <Footer />
 
       {/* POP-UP DEMO MODAL */}
       {isModalOpen && (

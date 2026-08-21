@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import {
   PhoneCall,
   MessageSquare,
@@ -380,6 +381,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* FOOTER */}
+      <Footer />
 
       {/* POP-UP DEMO MODAL */}
       {isModalOpen && (
