@@ -8,6 +8,9 @@ import { ThemeToggle } from '@/components/theme'
 
 const TITLES: Record<string, string> = {
   '/': 'Dashboard',
+  '/agent': 'Agent Calling Hub',
+  '/agent/leads': 'My Assigned Leads',
+  '/agent/inbox': 'Agent Messaging Inbox',
   '/dashboard': 'Dashboard',
   '/leads': 'Leads',
   '/inbox': 'Inbox',
