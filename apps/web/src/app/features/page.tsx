@@ -30,6 +30,7 @@ import {
   CheckCircle,
   Building2Icon,
   Phone,
+  FileText,
 } from "lucide-react";
 
 interface Feature {
@@ -336,6 +337,247 @@ const ALL_FEATURES: Feature[] = [
   },
 ];
 
+function FeatureVisualMockup({ feature }: { feature: Feature }) {
+  const isCalling =
+    feature.category === "CALLING" ||
+    feature.id.includes("dialer") ||
+    feature.id.includes("recording") ||
+    feature.id.includes("reminders");
+  const isWhatsApp =
+    feature.category === "MARKETING" ||
+    feature.id.includes("whatsapp") ||
+    feature.id.includes("sms") ||
+    feature.id.includes("notification");
+  const isAnalytics =
+    feature.category === "ANALYTICS" ||
+    feature.id.includes("report") ||
+    feature.id.includes("leaderboard") ||
+    feature.id.includes("payment");
+  const isAutomation =
+    feature.category === "AUTOMATION" ||
+    feature.id.includes("workflow") ||
+    feature.id.includes("lead") ||
+    feature.id.includes("api") ||
+    feature.id.includes("excel") ||
+    feature.id.includes("fb");
+
+  const backdropGradient = isWhatsApp
+    ? "from-emerald-200/50 via-teal-100/40 to-green-200/40"
+    : isAnalytics
+    ? "from-amber-200/50 via-orange-100/40 to-yellow-200/40"
+    : isAutomation
+    ? "from-cyan-200/50 via-sky-100/40 to-blue-200/40"
+    : "from-purple-200/50 via-indigo-100/40 to-pink-200/40";
+
+  return (
+    <div className="relative flex items-center justify-center p-2 sm:p-4">
+      {/* 1. Ambient Backdrop Blob */}
+      <div
+        className={`absolute -inset-4 bg-gradient-to-tr ${backdropGradient} rounded-full blur-2xl -z-10 pointer-events-none transform -rotate-6`}
+      />
+
+      {/* 4A. Floating Popover Badge - Top Right */}
+      <div className="absolute -top-2 -right-2 sm:-right-4 bg-white/95 backdrop-blur-md shadow-xl border border-slate-100/90 rounded-2xl p-2 sm:p-2.5 text-[10px] font-extrabold text-slate-800 flex items-center gap-1.5 z-20 shadow-indigo-950/10 animate-in fade-in">
+        {isWhatsApp ? (
+          <>
+            <span className="flex size-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-emerald-600 font-black">Official Cloud API</span>
+          </>
+        ) : isAnalytics ? (
+          <>
+            <span className="text-amber-500 font-black">🏆 Rank #1</span>
+            <span className="text-slate-600 font-mono">142 Calls</span>
+          </>
+        ) : isAutomation ? (
+          <>
+            <span className="text-[#6C5CE7] font-black">⚡ Instant Sync</span>
+            <span className="text-slate-600 font-mono">0.2s</span>
+          </>
+        ) : (
+          <>
+            <span className="flex size-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-emerald-600 font-black">Live Dialing</span>
+          </>
+        )}
+      </div>
+
+      {/* 2. Device Bezel (Phone Frame) */}
+      <div className="relative w-60 sm:w-68 rounded-[2.75rem] border-[6px] border-slate-900 bg-slate-950 shadow-2xl p-3.5 space-y-2.5 z-10 overflow-hidden text-white">
+        {/* Inner Camera Pill / Speaker Notch */}
+        <div className="w-20 h-3.5 bg-slate-900 rounded-b-xl mx-auto -mt-3.5 mb-2 flex items-center justify-center">
+          <div className="size-1.5 rounded-full bg-slate-800" />
+        </div>
+
+        {/* 3. Micro-UI Screen Content */}
+        {isWhatsApp ? (
+          /* WhatsApp Micro-UI Screen */
+          <div className="space-y-2.5 pt-1">
+            {/* Header */}
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
+              <div className="size-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black">
+                W
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold truncate text-white">WhatsApp Broadcast</p>
+                <p className="text-[9px] text-emerald-400 font-medium font-mono">500 Leads • 98.4% Delivered</p>
+              </div>
+            </div>
+
+            {/* Chat Bubble with Brochure */}
+            <div className="bg-emerald-950/60 border border-emerald-500/20 rounded-2xl rounded-tl-none p-2.5 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-emerald-300 font-semibold">
+                <FileText className="size-3 text-emerald-400" />
+                <span className="truncate">Bandra_3BHK_Brochure.pdf</span>
+              </div>
+              <p className="text-[10px] text-slate-200 leading-snug">
+                Hi {feature.mockup.callerName || "there"}! Here is your requested price list.
+              </p>
+              <div className="flex items-center justify-end gap-1 text-[8px] text-emerald-400 font-mono">
+                <span>12:45 PM</span>
+                <span>✓✓</span>
+              </div>
+            </div>
+
+            {/* Reply pill */}
+            <div className="bg-slate-900 rounded-xl p-2 text-[9px] text-slate-300 flex items-center justify-between border border-slate-800 font-medium">
+              <span className="truncate">&quot;Interested! Call me at 4 PM&quot;</span>
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            </div>
+          </div>
+        ) : isAnalytics ? (
+          /* Leaderboard & Reports Micro-UI Screen */
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-amber-400 flex items-center gap-1">
+                <Trophy className="size-3 text-amber-400" /> {feature.heading}
+              </span>
+              <span className="text-[9px] text-slate-400 font-mono">Today</span>
+            </div>
+
+            {/* Top 3 Caller Cards */}
+            <div className="space-y-1">
+              {[
+                { rank: "🥇", name: "Aarav Sharma", score: "142 Calls", rev: "₹1.35L" },
+                { rank: "🥈", name: "Priya Patel", score: "128 Calls", rev: "₹98K" },
+                { rank: "🥉", name: "Rohan Verma", score: "94 Calls", rev: "₹84K" },
+              ].map((r, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-[10px]"
+                >
+                  <span className="font-bold flex items-center gap-1 text-[10px]">
+                    <span>{r.rank}</span>
+                    <span className="text-white truncate max-w-[90px]">{r.name}</span>
+                  </span>
+                  <span className="text-emerald-400 font-mono font-bold text-[9px]">{r.score}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Shift Target Bar */}
+            <div className="pt-1">
+              <div className="flex justify-between text-[9px] text-slate-400 mb-1 font-medium">
+                <span>Daily Quota (500 Calls)</span>
+                <span className="text-emerald-400 font-bold font-mono">89%</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#6C5CE7] to-emerald-400 rounded-full w-[89%]" />
+              </div>
+            </div>
+          </div>
+        ) : isAutomation ? (
+          /* Smart Workflows & Lead Routing Micro-UI Screen */
+          <div className="space-y-2 pt-1">
+            <div className="text-[10px] font-bold text-[#6C5CE7] flex items-center gap-1 pb-1 border-b border-slate-800">
+              <Zap className="size-3 text-[#6C5CE7]" /> {feature.heading}
+            </div>
+
+            {/* Node 1: Trigger */}
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 text-[10px] space-y-0.5">
+              <div className="text-slate-400 text-[8px] uppercase font-bold">1. Ingest Trigger</div>
+              <p className="text-white font-semibold truncate">Meta Lead Ad Form Ingest</p>
+            </div>
+
+            {/* Connector */}
+            <div className="text-center text-[#6C5CE7] text-[9px] font-bold font-mono">↓ 0.2s sync</div>
+
+            {/* Node 2: Action */}
+            <div className="bg-indigo-950/60 p-2 rounded-xl border border-indigo-500/30 text-[10px] space-y-0.5">
+              <div className="text-indigo-400 text-[8px] uppercase font-bold">2. Auto Allocation</div>
+              <p className="text-indigo-200 font-semibold truncate">Round-Robin ➔ Agent Desk</p>
+            </div>
+          </div>
+        ) : (
+          /* 1-Click Dialer & Live Calling Micro-UI Screen */
+          <div className="space-y-2.5 pt-1 text-center">
+            <div className="space-y-0.5">
+              <div className="size-10 rounded-full bg-gradient-to-tr from-[#6C5CE7] to-indigo-400 flex items-center justify-center text-white text-xs font-black mx-auto shadow-md">
+                AS
+              </div>
+              <h5 className="text-xs font-black text-white truncate">{feature.mockup.callerName}</h5>
+              <p className="text-[10px] font-mono text-slate-400">{feature.mockup.phone}</p>
+            </div>
+
+            {/* Audio Waveform Simulator */}
+            <div className="flex items-center justify-center gap-1 h-5">
+              {[4, 8, 14, 18, 10, 16, 20, 12, 6, 14, 8].map((h, i) => (
+                <span
+                  key={i}
+                  className="w-1 bg-emerald-400 rounded-full animate-pulse"
+                  style={{ height: `${h}px`, animationDelay: `${i * 100}ms` }}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono text-emerald-400 bg-emerald-950/40 py-0.5 px-2.5 rounded-full border border-emerald-500/20 w-fit mx-auto">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <span>02:45 In Call</span>
+            </div>
+
+            {/* 1-Tap Outcome Buttons */}
+            <div className="grid grid-cols-3 gap-1 pt-1">
+              <div className="bg-emerald-600/30 border border-emerald-500/30 p-1.5 rounded-lg text-emerald-300 text-[8px] font-bold text-center">
+                Connected
+              </div>
+              <div className="bg-amber-600/30 border border-amber-500/30 p-1.5 rounded-lg text-amber-300 text-[8px] font-bold text-center">
+                Busy
+              </div>
+              <div className="bg-[#6C5CE7]/30 border border-indigo-500/30 p-1.5 rounded-lg text-indigo-300 text-[8px] font-bold text-center">
+                WhatsApp
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 4B. Floating Popover Badge - Bottom Left */}
+      <div className="absolute -bottom-2 -left-2 sm:-left-4 bg-white/95 backdrop-blur-md shadow-xl border border-slate-100/90 rounded-2xl p-2 sm:p-2.5 text-[10px] font-extrabold text-slate-800 flex items-center gap-1.5 z-20 shadow-indigo-950/10 animate-in fade-in">
+        {isWhatsApp ? (
+          <>
+            <span className="text-emerald-600 font-black">💬 WhatsApp</span>
+            <span className="text-slate-600">Brochure Sent</span>
+          </>
+        ) : isAnalytics ? (
+          <>
+            <span className="text-emerald-600 font-black">📈 ₹4.85L</span>
+            <span className="text-slate-600">Closed</span>
+          </>
+        ) : isAutomation ? (
+          <>
+            <span className="text-cyan-600 font-black">🎯 Round-Robin</span>
+            <span className="text-slate-600">Assigned</span>
+          </>
+        ) : (
+          <>
+            <span className="text-[#6C5CE7] font-black">🎙️ HD Cloud</span>
+            <span className="text-slate-600">Audio Synced</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const TEAM_SIZES = ["1 - 5 members", "6 - 15 members", "16 - 50 members", "50+ members"];
 
 export default function FeaturesPage() {
@@ -565,39 +807,8 @@ export default function FeaturesPage() {
                         </button>
                       </div>
 
-                      <div className="flex justify-center">
-                        <div className="w-56 sm:w-60 bg-slate-900 rounded-[32px] p-3.5 border-4 border-slate-800 shadow-2xl space-y-3">
-                          <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto" />
-                          <div className="text-center py-3 border-b border-slate-800/80 space-y-0.5">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                              {feature.title}
-                            </span>
-                            <h4 className="text-xs font-extrabold text-white">
-                              {feature.mockup.callerName}
-                            </h4>
-                            <p className="text-[11px] text-slate-400">
-                              {feature.mockup.phone}
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-1 text-center py-1">
-                            <div className="bg-indigo-600/30 p-2 rounded-lg text-indigo-300 text-[9px] font-bold">
-                              Call
-                            </div>
-                            <div className="bg-emerald-600/30 p-2 rounded-lg text-emerald-300 text-[9px] font-bold">
-                              WhatsApp
-                            </div>
-                            <div className="bg-purple-600/30 p-2 rounded-lg text-purple-300 text-[9px] font-bold">
-                              SMS
-                            </div>
-                          </div>
-
-                          <div className="bg-slate-800/60 rounded-lg p-2 text-center">
-                            <span className="text-[9px] text-emerald-400 font-semibold">
-                              ● {feature.mockup.status}
-                            </span>
-                          </div>
-                        </div>
+                      <div className="flex justify-center items-center">
+                        <FeatureVisualMockup feature={feature} />
                       </div>
                     </div>
                   </div>
