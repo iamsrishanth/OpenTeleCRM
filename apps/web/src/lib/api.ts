@@ -20,12 +20,14 @@ let _ctx: ApiClientCtx | null = null
 let _listeners: Array<(() => void) | null> = []
 
 /** Call once after login/dev-jwt is obtained. */
-export function setApiCtx(ctx: ApiClientCtx) {
+export function setApiCtx(ctx: ApiClientCtx | null) {
   _ctx = ctx
-  for (const cb of _listeners) {
-    cb?.()
+  if (ctx) {
+    for (const cb of _listeners) {
+      cb?.()
+    }
+    _listeners = []
   }
-  _listeners = []
 }
 
 export function getApiCtx(): ApiClientCtx | null {

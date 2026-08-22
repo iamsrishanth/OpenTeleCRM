@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth, type UserRole } from '@/lib/auth-context'
 import { api } from '@/lib/api'
 
 export interface MeInfo {
@@ -12,15 +12,19 @@ export interface MeInfo {
   departmentName?: string | null
 }
 
-const ADMIN_ROLES = ['owner', 'admin']
+const ADMIN_ROLES = ['owner', 'admin', 'manager']
 
 /**
- * Resolve the current member + role via GET /enterprise/{eid}/me.
- * `ready` flips true once the fetch settles (or there's no session) so
- * callers can gate renders without a flash of admin UI.
+ * Resolve the current member + role.
  */
-export function useRole(): { me: MeInfo | null; ready: boolean; isAdmin: boolean } {
-  const { token, enterpriseId } = useAuth()
+export function useRole(): {
+  me: MeInfo | null
+  ready: boolean
+  isAdmin: boolean
+  isAgent: boolean
+  userRole: UserRole
+} {
+  const { token, enterpriseId, userRole } = useAuth()
   const [me, setMe] = useState<MeInfo | null>(null)
   const [ready, setReady] = useState(false)
 
@@ -48,5 +52,8 @@ export function useRole(): { me: MeInfo | null; ready: boolean; isAdmin: boolean
     }
   }, [token, enterpriseId])
 
-  return { me, ready, isAdmin: me ? ADMIN_ROLES.includes(me.roleName) : false }
+  const isAdmin = userRole === 'admin' || (me ? ADMIN_ROLES.includes(me.roleName.toLowerCase()) : false)
+  const isAgent = userRole === 'agent'
+
+  return { me, ready, isAdmin, isAgent, userRole }
 }

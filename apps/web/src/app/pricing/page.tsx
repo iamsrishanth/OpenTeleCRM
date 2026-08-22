@@ -1,24 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
-  PhoneCall,
-  MessageSquare,
-  BarChart3,
-  Users,
-  Zap,
   CheckCircle2,
   ChevronDown,
-  Star,
-  Quote,
+  Play,
   HelpCircle,
-  ArrowRight,
   ShieldCheck,
+  Zap,
   UserCheck,
+  ArrowRight,
+  PlusCircle,
   X,
+  Users,
   Building2Icon,
   Mail,
   Phone,
@@ -32,119 +28,43 @@ interface FAQItem {
 
 const FAQS: FAQItem[] = [
   {
-    question: "What is TeleCRM and who is it for?",
-    answer:
-      "TeleCRM is an all-in-one telecalling CRM built specifically for sales teams. It combines a 1-click mobile auto-dialer, automatic call recording, lead management, and WhatsApp automation.",
+    question: "Can I try TeleCRM before purchasing?",
+    answer: "Yes! You can schedule a live demo with our team, and we will set up a free trial tailored to your sales process and requirements.",
   },
   {
-    question: "How does the 1-Click Dialer work?",
-    answer:
-      "Your agents simply tap a single button on their smartphone to call the next lead in queue. Call logs, durations, and audio recordings are automatically synced back to the CRM.",
+    question: "How long does the onboarding process take?",
+    answer: "Most sales teams get fully onboarded within 15 to 30 minutes. Our team helps you import contacts, integrate Facebook/WhatsApp, and train your agents.",
   },
   {
-    question: "Can I connect TeleCRM with Meta Ads and Google Forms?",
-    answer:
-      "Yes! TeleCRM offers instant, zero-latency integrations with Facebook Lead Ads, Google Forms, Housing.com, 99acres, and custom webhooks.",
+    question: "Are there any hidden setup or integration fees?",
+    answer: "No, all plans come with transparent pricing. Core features, app access, and standard integrations are included without surprise costs.",
   },
   {
-    question: "Is there any hardware or setup required?",
-    answer:
-      "No extra hardware required! Your sales agents can use their existing Android phones to make calls while managers track everything from the web dashboard.",
+    question: "Can I change or upgrade my plan later?",
+    answer: "Absolutely! You can add more agent seats or switch between Quarterly and Annual billing cycles at any time from your account settings.",
   },
   {
-    question: "Does TeleCRM support WhatsApp automation?",
-    answer:
-      "Yes, TeleCRM integrates with WhatsApp Cloud API to let you send 1-click messages, automated follow-up sequences, and bulk broadcast campaigns.",
+    question: "Does TeleCRM support WhatsApp API integration?",
+    answer: "Yes, TeleCRM seamlessly connects with WhatsApp Cloud API to automate messages, send broadcast campaigns, and log incoming leads automatically.",
   },
 ];
 
-const FEATURES = [
-  {
-    icon: PhoneCall,
-    title: "1-Click Auto Dialer",
-    href: "/features#1-click-dialer",
-    description:
-      "Eliminate manual dialing. Your team can call up to 300+ leads daily directly from their smartphones with automated queueing.",
-  },
-  {
-    icon: MessageSquare,
-    title: "WhatsApp Automation",
-    href: "/features#whatsapp-broadcast-marketing",
-    description:
-      "Send instant welcome messages, property brochures, or quotes on WhatsApp immediately after every call with custom templates.",
-  },
-  {
-    icon: BarChart3,
-    title: "Live Reports & Leaderboards",
-    href: "/features#leaderboard-report",
-    description:
-      "Track total calls, talk time, lead conversion ratios, and daily team performance with real-time visual dashboards.",
-  },
-  {
-    icon: Users,
-    title: "Lead Management & Routing",
-    href: "/features#lead-routing",
-    description:
-      "Organize, filter, and track leads effortlessly from capturing to closing across all pipeline stages.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Automatic Call Recording",
-    href: "/features#automatic-call-recording",
-    description:
-      "Record all incoming and outgoing sales calls automatically and store them securely on the cloud for training and QA.",
-  },
-  {
-    icon: Zap,
-    title: "Smart Workflows & API",
-    href: "/features#smart-workflows",
-    description:
-      "Distribute incoming leads evenly among your telecalling agents or route them based on location, budget, or custom criteria.",
-  },
-];
-
-const TESTIMONIALS = [
-  {
-    quote:
-      "TeleCRM increased our calling volume by 2.5x within the first week. Our admissions counselors love how simple the 1-click dialer is.",
-    name: "Rajesh Sharma",
-    role: "Head of Admissions",
-    company: "EduTech Global",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150",
-    rating: 5,
-  },
-  {
-    quote:
-      "Integrating our Meta lead ads directly with WhatsApp automation saved us hours every day. Instant follow-ups doubled our conversion rate.",
-    name: "Priya Nair",
-    role: "Sales Director",
-    company: "Apex Real Estate",
-    avatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150",
-    rating: 5,
-  },
-  {
-    quote:
-      "The live supervisor dashboard gives complete visibility into agent talk times and recordings. It transformed our telecalling operations.",
-    name: "Ankit Verma",
-    role: "Operations Lead",
-    company: "FastLoan DSA",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150",
-    rating: 5,
-  },
+const ADD_ONS = [
+  { name: "Official WhatsApp Cloud API" },
+  { name: "Extra Lead Source Integrations" },
+  { name: "Dedicated Onboarding Specialist" },
 ];
 
 const TEAM_SIZES = ["1 - 5 members", "6 - 15 members", "16 - 50 members", "50+ members"];
 
-export default function Home() {
+export default function PricingPage() {
+  const [isAddonsOpen, setIsAddonsOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   // Demo Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2 | 3>(1);
-  const [selectedDemoContext, setSelectedDemoContext] = useState("");
+  const [selectedPlanContext, setSelectedPlanContext] = useState("");
 
   // Form Data State
   const [teamSize, setTeamSize] = useState("");
@@ -158,8 +78,8 @@ export default function Home() {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
   };
 
-  const openDemoModal = (contextTitle: string = "General Sales Demo") => {
-    setSelectedDemoContext(contextTitle);
+  const openDemoModal = (planContext: string = "Standard Plan") => {
+    setSelectedPlanContext(planContext);
     setTeamSize("");
     setFormData({ companyName: "", email: "", phone: "" });
     setModalStep(1);
@@ -186,162 +106,155 @@ export default function Home() {
     <div className="min-h-screen bg-[#FAF9FF] text-slate-900 font-sans relative">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="pt-16 pb-20 px-6 max-w-7xl mx-auto text-center space-y-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <h1 className="text-4xl sm:text-6xl font-black text-slate-900 tracking-tight leading-tight">
-            Build efficient sales system for your team
+      {/* Main Pricing Section */}
+      <section className="py-16 px-6 max-w-5xl mx-auto space-y-12">
+        {/* Title Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+            Pricing
           </h1>
-          <p className="text-slate-600 text-lg sm:text-xl font-medium max-w-3xl mx-auto leading-relaxed">
-            With lead management, phone calls, meetings, and WhatsApp communication managed on a single platform.
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
+            Sales CRM Pricing
           </p>
+        </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+        {/* Pricing Card Table */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-8 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            {/* Left Features Column */}
+            <div className="lg:col-span-7 space-y-6">
+              <h3 className="text-2xl font-black text-slate-900">Core CRM</h3>
+              
+              <ul className="space-y-4">
+                <li className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span>Excel upload</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span>1-click dialer, Call recording</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span>Follow-ups</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span>Reports & Leaderboard</span>
+                </li>
+                <li className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                  <span className="flex items-center gap-1">
+                    Automations <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right Pricing Columns (Quarterly & Annual) */}
+            <div className="lg:col-span-5 grid grid-cols-2 gap-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-8 lg:pt-0 lg:pl-8 text-center items-center">
+              
+              {/* Quarterly Option */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-indigo-600">Quarterly</span>
+                <div>
+                  <span className="text-3xl font-black text-slate-900">₹1099</span>
+                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">/user/mo</p>
+                  <p className="text-[10px] text-slate-400 font-medium">(billed quarterly)</p>
+                </div>
+                <button
+                  onClick={() => openDemoModal("Quarterly Plan (₹1099/user/mo)")}
+                  className="w-full bg-white hover:bg-slate-50 text-[#6C5CE7] border-2 border-[#6C5CE7] font-extrabold py-2.5 rounded-xl text-xs transition cursor-pointer"
+                >
+                  Buy Now
+                </button>
+              </div>
+
+              {/* Annual Option (Highlighted with Badge) */}
+              <div className="space-y-3 relative">
+                <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                  Save 27%
+                </div>
+
+                <span className="text-xs font-bold text-slate-700">Annual</span>
+                <div>
+                  <span className="text-3xl font-black text-slate-900">₹799</span>
+                  <p className="text-[11px] font-bold text-slate-400 mt-0.5">/user/mo</p>
+                  <p className="text-[10px] text-slate-400 font-medium">(billed annually)</p>
+                </div>
+                <button
+                  onClick={() => openDemoModal("Annual Plan (₹799/user/mo)")}
+                  className="w-full bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-md cursor-pointer"
+                >
+                  Buy Now
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Add-ons Accordion Bar */}
+          <div className="border-t border-slate-100 bg-slate-50/50">
             <button
-              onClick={() => openDemoModal("Hero - Book Demo Call")}
-              className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-4 px-8 rounded-2xl text-sm shadow-xl shadow-indigo-500/20 transition cursor-pointer active:scale-95"
+              onClick={() => setIsAddonsOpen(!isAddonsOpen)}
+              className="w-full p-6 flex justify-between items-center text-left font-extrabold text-sm text-slate-800 hover:text-[#6C5CE7] transition cursor-pointer"
             >
-              Book Demo call
+              <span>Add-ons</span>
+              <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${isAddonsOpen ? "rotate-180 text-[#6C5CE7]" : ""}`} />
             </button>
-            <Link
-              href="/features"
-              className="bg-white hover:bg-slate-50 text-slate-800 font-extrabold py-4 px-8 rounded-2xl text-sm border border-slate-200 shadow-sm transition flex items-center gap-1.5"
-            >
-              Explore All Features <ArrowRight className="w-4 h-4 text-[#6C5CE7]" />
-            </Link>
+
+            {isAddonsOpen && (
+              <div className="px-6 pb-6 space-y-3 border-t border-slate-100 pt-4 bg-white">
+                {ADD_ONS.map((addon, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs font-semibold p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="flex items-center gap-2 text-slate-700">
+                      <PlusCircle className="w-4 h-4 text-[#6C5CE7]" />
+                      {addon.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Trusted Companies Section */}
-      <section className="py-12 bg-white border-y border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-6 text-center space-y-6">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-            Trusted by Indian sales teams who sell to Indian customers
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 opacity-70 grayscale hover:grayscale-0 transition-all duration-300">
-            <span className="text-xl font-black text-slate-800">Domino&apos;s</span>
-            <span className="text-xl font-black text-slate-800">BYJU&apos;S</span>
-            <span className="text-xl font-black text-slate-800">Mercedes-Benz</span>
-            <span className="text-xl font-black text-slate-800">CELLBELL</span>
-            <span className="text-xl font-black text-slate-800">Shiprocket</span>
-            <span className="text-xl font-black text-slate-800">COX &amp; KINGS</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Key Features Grid Section */}
-      <section className="py-24 px-6 max-w-7xl mx-auto space-y-16">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="text-xs font-black uppercase tracking-widest text-[#6C5CE7] bg-indigo-50 border border-indigo-100 px-4 py-1.5 rounded-full inline-block">
-            POWERFUL CAPABILITIES
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            Everything you need to run a high-converting sales engine
-          </h2>
-          <p className="text-slate-500 text-sm sm:text-base font-medium">
-            Designed from the ground up for Indian telecalling environments and sales teams.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {FEATURES.map((feat, idx) => (
-            <Link
-              key={idx}
-              href={feat.href}
-              className="bg-white rounded-3xl border border-slate-200/80 p-8 space-y-4 shadow-sm hover:shadow-xl hover:border-[#6C5CE7]/40 transition hover:-translate-y-1 duration-200 group block cursor-pointer"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#6C5CE7] flex items-center justify-center font-bold group-hover:scale-105 group-hover:bg-[#6C5CE7] group-hover:text-white transition-all">
-                <feat.icon className="w-6 h-6" />
-              </div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-extrabold text-slate-900 group-hover:text-[#6C5CE7] transition-colors">
-                  {feat.title}
-                </h3>
-                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#6C5CE7] group-hover:translate-x-1 transition-all" />
-              </div>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-                {feat.description}
-              </p>
-            </Link>
-          ))}
-        </div>
-
-        <div className="text-center pt-2">
-          <Link
-            href="/features"
-            className="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-[#6C5CE7] font-black px-8 py-4 rounded-2xl text-sm transition border border-indigo-200/60 shadow-sm"
-          >
-            See All 20+ Sales Capabilities &amp; Features <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-20 bg-white border-t border-b border-slate-200/80 px-6">
-        <div className="max-w-7xl mx-auto space-y-16">
-          <div className="text-center space-y-3 max-w-2xl mx-auto">
-            <span className="text-xs font-black uppercase tracking-widest text-[#6C5CE7]">
-              CUSTOMER SUCCESS STORIES
-            </span>
+      {/* Onboarding Process Video Section */}
+      <section className="bg-white py-20 px-6 border-t border-b border-slate-200/80">
+        <div className="max-w-5xl mx-auto space-y-12 text-center">
+          <div className="space-y-3">
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Loved by 1,000+ sales teams across India
+              Customer Onboarding Process
             </h2>
-            <p className="text-slate-500 text-sm font-medium">
-              Here is how businesses scale their sales operations with TeleCRM.
+            <p className="text-slate-500 text-sm max-w-xl mx-auto">
+              Watch step-by-step how easy it is to import leads, configure agent workflows, and start calling.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t, idx) => (
-              <div
-                key={idx}
-                className="bg-[#FAF9FF] rounded-3xl border border-slate-200/80 p-8 flex flex-col justify-between space-y-6 shadow-sm relative"
-              >
-                <Quote className="w-8 h-8 text-indigo-200 absolute top-6 right-6" />
-
-                <div className="space-y-4">
-                  <div className="flex gap-1 text-amber-400">
-                    {[...Array(t.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed italic">
-                    "{t.quote}"
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 pt-4 border-t border-slate-200/60">
-                  <img
-                    src={t.avatar}
-                    alt={t.name}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-300"
-                  />
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-900">{t.name}</h4>
-                    <p className="text-[11px] font-bold text-slate-400">
-                      {t.role}, <span className="text-[#6C5CE7]">{t.company}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Video Placeholder Container */}
+          <div className="max-w-3xl mx-auto relative rounded-3xl overflow-hidden shadow-2xl bg-slate-900 border-4 border-slate-800 group">
+            <div className="aspect-video flex flex-col justify-center items-center relative p-8 text-center space-y-4 bg-gradient-to-tr from-[#180B38] via-slate-900 to-[#2A185C]">
+              <button className="w-20 h-20 rounded-full bg-[#6C5CE7] text-white flex items-center justify-center shadow-2xl transition-transform duration-300 transform group-hover:scale-110 cursor-pointer">
+                <Play className="w-8 h-8 fill-white ml-1" />
+              </button>
+              <h4 className="text-xl font-extrabold text-white tracking-tight">
+                Watch TeleCRM Setup Walkthrough
+              </h4>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-24 px-6 max-w-4xl mx-auto space-y-10">
+      {/* Frequently Asked Questions (FAQ) Section */}
+      <section className="py-20 px-6 max-w-4xl mx-auto space-y-10">
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-2 text-[#6C5CE7] font-bold text-xs uppercase tracking-wider">
             <HelpCircle className="w-4 h-4" /> Got Questions?
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">
             Frequently Asked Questions
           </h2>
-          <p className="text-slate-500 text-xs sm:text-sm">
-            Everything you need to know about setting up TeleCRM for your sales team.
-          </p>
         </div>
 
         <div className="space-y-4">
@@ -374,8 +287,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Request a Demo CTA Section */}
-      <section className="pb-24 px-6 max-w-5xl mx-auto">
+      {/* Request a Demo CTA Box Section */}
+      <section className="pb-20 px-6 max-w-5xl mx-auto">
         <div className="bg-gradient-to-r from-[#180B38] via-[#2A185C] to-[#180B38] rounded-3xl p-8 sm:p-14 text-white text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="max-w-2xl mx-auto space-y-4">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
@@ -388,7 +301,7 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
             <button
-              onClick={() => openDemoModal("Landing Page Bottom CTA")}
+              onClick={() => openDemoModal("Live Demo CTA")}
               className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-4 px-8 rounded-2xl text-sm shadow-xl transition cursor-pointer flex items-center gap-2"
             >
               <span>Request a Live Demo</span>
@@ -397,15 +310,9 @@ export default function Home() {
           </div>
 
           <div className="pt-6 flex flex-wrap justify-center gap-6 text-[11px] font-bold text-slate-400 border-t border-white/10 max-w-xl mx-auto">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> No credit card required
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-400" /> Instant account setup
-            </span>
-            <span className="flex items-center gap-1.5">
-              <UserCheck className="w-3.5 h-3.5 text-indigo-400" /> Free onboarding support
-            </span>
+            <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> No credit card required</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Instant account setup</span>
+            <span className="flex items-center gap-1.5"><UserCheck className="w-3.5 h-3.5 text-indigo-400" /> Free onboarding support</span>
           </div>
         </div>
       </section>
@@ -436,7 +343,7 @@ export default function Home() {
                     How many members are in your team?
                   </h3>
                   <p className="text-xs text-slate-500">
-                    We’ll customize your live demo according to your team size.
+                    We’ll customize your demo and pricing breakdown for your team.
                   </p>
                 </div>
 
@@ -551,7 +458,7 @@ export default function Home() {
                 <div className="space-y-1.5">
                   <h3 className="text-xl font-black text-slate-900">Response Received!</h3>
                   <p className="text-xs text-slate-600 font-medium leading-relaxed px-2">
-                    Thank you, <span className="font-extrabold text-slate-900">{formData.companyName}</span>! Our specialist will reach out shortly at{" "}
+                    Thank you, <span className="font-extrabold text-slate-900">{formData.companyName}</span>! Our pricing specialist will reach out shortly at{" "}
                     <span className="font-extrabold text-slate-900">{formData.email}</span> /{" "}
                     <span className="font-extrabold text-slate-900">{formData.phone}</span> to schedule your demo.
                   </p>
