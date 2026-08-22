@@ -31,6 +31,18 @@ import {
   Building2Icon,
   Phone,
   FileText,
+  Play,
+  TrendingUp,
+  Send,
+  Layers,
+  Filter,
+  Flame,
+  ShieldCheck,
+  Tag,
+  ArrowUpRight,
+  Radio,
+  RefreshCw,
+  Sliders,
 } from "lucide-react";
 
 interface Feature {
@@ -338,189 +350,344 @@ const ALL_FEATURES: Feature[] = [
 ];
 
 function FeatureVisualMockup({ feature }: { feature: Feature }) {
-  const isCalling =
-    feature.category === "CALLING" ||
-    feature.id.includes("dialer") ||
-    feature.id.includes("recording") ||
-    feature.id.includes("reminders");
-  const isWhatsApp =
-    feature.category === "MARKETING" ||
-    feature.id.includes("whatsapp") ||
-    feature.id.includes("sms") ||
-    feature.id.includes("notification");
-  const isAnalytics =
-    feature.category === "ANALYTICS" ||
-    feature.id.includes("report") ||
-    feature.id.includes("leaderboard") ||
-    feature.id.includes("payment");
-  const isAutomation =
-    feature.category === "AUTOMATION" ||
-    feature.id.includes("workflow") ||
-    feature.id.includes("lead") ||
-    feature.id.includes("api") ||
-    feature.id.includes("excel") ||
-    feature.id.includes("fb");
+  // Gradients for ambient blob based on feature domain
+  const getBlobGradient = (id: string) => {
+    switch (id) {
+      case "1-click-dialer":
+      case "automatic-call-recording":
+        return "from-purple-200/60 via-indigo-100/50 to-pink-200/50";
+      case "whatsapp-broadcast-marketing":
+      case "whatsapp-alerts":
+      case "1-click-whatsapp":
+        return "from-emerald-200/60 via-teal-100/50 to-green-200/50";
+      case "leaderboard-report":
+      case "sales-report":
+      case "agents-report":
+      case "hour-by-hour-report":
+        return "from-amber-200/60 via-orange-100/50 to-yellow-200/50";
+      case "smart-workflows":
+      case "lead-routing":
+      case "fb-lead-capture":
+      case "custom-api-integration":
+      case "excel-import":
+        return "from-cyan-200/60 via-sky-100/50 to-blue-200/50";
+      case "call-reminders":
+      case "push-notification":
+        return "from-rose-200/60 via-pink-100/50 to-red-200/50";
+      case "payment-creation":
+        return "from-emerald-200/60 via-lime-100/50 to-teal-200/50";
+      default:
+        return "from-indigo-200/60 via-purple-100/50 to-blue-200/50";
+    }
+  };
 
-  const backdropGradient = isWhatsApp
-    ? "from-emerald-200/50 via-teal-100/40 to-green-200/40"
-    : isAnalytics
-    ? "from-amber-200/50 via-orange-100/40 to-yellow-200/40"
-    : isAutomation
-    ? "from-cyan-200/50 via-sky-100/40 to-blue-200/40"
-    : "from-purple-200/50 via-indigo-100/40 to-pink-200/40";
-
-  return (
-    <div className="relative flex items-center justify-center p-2 sm:p-4">
-      {/* 1. Ambient Backdrop Blob */}
-      <div
-        className={`absolute -inset-4 bg-gradient-to-tr ${backdropGradient} rounded-full blur-2xl -z-10 pointer-events-none transform -rotate-6`}
-      />
-
-      {/* 4A. Floating Popover Badge - Top Right */}
-      <div className="absolute -top-2 -right-2 sm:-right-4 bg-white/95 backdrop-blur-md shadow-xl border border-slate-100/90 rounded-2xl p-2 sm:p-2.5 text-[10px] font-extrabold text-slate-800 flex items-center gap-1.5 z-20 shadow-indigo-950/10 animate-in fade-in">
-        {isWhatsApp ? (
+  // Top Right Floating Badges
+  const renderTopBadge = () => {
+    switch (feature.id) {
+      case "1-click-dialer":
+        return (
+          <>
+            <span className="flex size-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-emerald-600 font-black">⚡ 1-Click Dialed</span>
+          </>
+        );
+      case "leaderboard-report":
+        return (
+          <>
+            <span className="text-amber-500 font-black">🏆 Rank #1 Rep</span>
+            <span className="text-slate-600 font-mono">142 Calls</span>
+          </>
+        );
+      case "whatsapp-broadcast-marketing":
+        return (
           <>
             <span className="flex size-2 rounded-full bg-emerald-500 animate-ping" />
             <span className="text-emerald-600 font-black">Official Cloud API</span>
           </>
-        ) : isAnalytics ? (
+        );
+      case "call-reminders":
+        return (
           <>
-            <span className="text-amber-500 font-black">🏆 Rank #1</span>
-            <span className="text-slate-600 font-mono">142 Calls</span>
+            <span className="text-rose-600 font-black">⏰ Due in 15m</span>
+            <span className="text-slate-600">High Intent</span>
           </>
-        ) : isAutomation ? (
+        );
+      case "sales-report":
+        return (
           <>
-            <span className="text-[#6C5CE7] font-black">⚡ Instant Sync</span>
-            <span className="text-slate-600 font-mono">0.2s</span>
+            <span className="text-emerald-600 font-black">📈 +34% MoM</span>
+            <span className="text-slate-600 font-mono">₹4.85L Won</span>
           </>
-        ) : (
+        );
+      case "smart-workflows":
+        return (
           <>
-            <span className="flex size-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-emerald-600 font-black">Live Dialing</span>
+            <span className="text-[#6C5CE7] font-black">🤖 3-Step Flow</span>
+            <span className="text-slate-600 font-mono">0.2s Sync</span>
           </>
-        )}
-      </div>
+        );
+      case "automatic-call-recording":
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">🎙️ 100% Recorded</span>
+            <span className="text-slate-600">Cloud Synced</span>
+          </>
+        );
+      case "agents-report":
+        return (
+          <>
+            <span className="text-amber-500 font-black">⭐ 4.9 Score</span>
+            <span className="text-slate-600 font-mono">3h 24m Talk</span>
+          </>
+        );
+      case "bulk-edit":
+        return (
+          <>
+            <span className="text-blue-600 font-black">⚡ 142 Selected</span>
+            <span className="text-slate-600">Batch Update</span>
+          </>
+        );
+      case "excel-import":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">📁 Smart Mapper</span>
+            <span className="text-slate-600 font-mono">1,250 Rows</span>
+          </>
+        );
+      case "fb-lead-capture":
+        return (
+          <>
+            <span className="text-blue-600 font-black">📸 Meta Ad Sync</span>
+            <span className="text-slate-600 font-mono">0.2s Ingest</span>
+          </>
+        );
+      case "custom-api-integration":
+        return (
+          <>
+            <span className="text-cyan-600 font-black">🔌 REST API</span>
+            <span className="text-emerald-600 font-mono font-black">200 OK</span>
+          </>
+        );
+      case "lead-routing":
+        return (
+          <>
+            <span className="text-purple-600 font-black">🔄 Round-Robin</span>
+            <span className="text-slate-600 font-mono">3 Reps</span>
+          </>
+        );
+      case "whatsapp-alerts":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">💬 WhatsApp Ping</span>
+            <span className="text-slate-600">Real-Time</span>
+          </>
+        );
+      case "1-click-whatsapp":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">💬 Direct Chat</span>
+            <span className="text-slate-600">No Save Needed</span>
+          </>
+        );
+      case "1-click-sms-email":
+        return (
+          <>
+            <span className="text-indigo-600 font-black">✉️ SMS + Email</span>
+            <span className="text-slate-600 font-mono">99.8% Inbox</span>
+          </>
+        );
+      case "push-notification":
+        return (
+          <>
+            <span className="text-rose-600 font-black">📱 Mobile Push</span>
+            <span className="text-slate-600">Instant Alert</span>
+          </>
+        );
+      case "payment-creation":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">💳 UPI / Card</span>
+            <span className="text-slate-600 font-mono">₹15,000</span>
+          </>
+        );
+      case "hour-by-hour-report":
+        return (
+          <>
+            <span className="text-amber-500 font-black">📊 Peak Tracker</span>
+            <span className="text-slate-600 font-mono">2-3 PM Peak</span>
+          </>
+        );
+      default:
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">⚡ TeleCRM Pro</span>
+            <span className="text-slate-600">Live Active</span>
+          </>
+        );
+    }
+  };
 
-      {/* 2. Device Bezel (Phone Frame) */}
-      <div className="relative w-60 sm:w-68 rounded-[2.75rem] border-[6px] border-slate-900 bg-slate-950 shadow-2xl p-3.5 space-y-2.5 z-10 overflow-hidden text-white">
-        {/* Inner Camera Pill / Speaker Notch */}
-        <div className="w-20 h-3.5 bg-slate-900 rounded-b-xl mx-auto -mt-3.5 mb-2 flex items-center justify-center">
-          <div className="size-1.5 rounded-full bg-slate-800" />
-        </div>
+  // Bottom Left Floating Badges
+  const renderBottomBadge = () => {
+    switch (feature.id) {
+      case "1-click-dialer":
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">📞 SIM Routing</span>
+            <span className="text-slate-600">0s Dial Delay</span>
+          </>
+        );
+      case "leaderboard-report":
+        return (
+          <>
+            <span className="text-amber-500 font-black">🔥 142 Calls</span>
+            <span className="text-slate-600">Daily Record</span>
+          </>
+        );
+      case "whatsapp-broadcast-marketing":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">📊 98.4% Open Rate</span>
+            <span className="text-slate-600">Brochure Sent</span>
+          </>
+        );
+      case "call-reminders":
+        return (
+          <>
+            <span className="text-rose-600 font-black">🎯 Zero Missed</span>
+            <span className="text-slate-600">1-Tap Dial</span>
+          </>
+        );
+      case "sales-report":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">💰 ₹4,85,000</span>
+            <span className="text-slate-600">24 Deals Closed</span>
+          </>
+        );
+      case "smart-workflows":
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">⚡ Auto Trigger</span>
+            <span className="text-slate-600">Lead Assigned</span>
+          </>
+        );
+      case "automatic-call-recording":
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">☁️ Cloud Audio</span>
+            <span className="text-slate-600">Saved in CRM</span>
+          </>
+        );
+      case "agents-report":
+        return (
+          <>
+            <span className="text-blue-600 font-black">⏱️ 3h 24m</span>
+            <span className="text-slate-600">Active Talk Time</span>
+          </>
+        );
+      case "bulk-edit":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">✅ 1s Process</span>
+            <span className="text-slate-600">All Updated</span>
+          </>
+        );
+      case "excel-import":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">0 Duplicates</span>
+            <span className="text-slate-600">Clean Import</span>
+          </>
+        );
+      case "fb-lead-capture":
+        return (
+          <>
+            <span className="text-blue-600 font-black">⚡ Instant Lead</span>
+            <span className="text-slate-600">Welcome Fired</span>
+          </>
+        );
+      case "custom-api-integration":
+        return (
+          <>
+            <span className="text-cyan-600 font-black">🚀 Webhook Synced</span>
+            <span className="text-slate-600">JSON Ingest</span>
+          </>
+        );
+      case "lead-routing":
+        return (
+          <>
+            <span className="text-purple-600 font-black">⚖️ Equal Balancing</span>
+            <span className="text-slate-600">&lt; 45s Contact</span>
+          </>
+        );
+      case "whatsapp-alerts":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">🔔 Site Visit Alert</span>
+            <span className="text-slate-600">Client Ready</span>
+          </>
+        );
+      case "1-click-whatsapp":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">⚡ 1-Tap Template</span>
+            <span className="text-slate-600">Price List Sent</span>
+          </>
+        );
+      case "1-click-sms-email":
+        return (
+          <>
+            <span className="text-indigo-600 font-black">📬 Omnichannel</span>
+            <span className="text-slate-600">SMS &amp; Email Sent</span>
+          </>
+        );
+      case "push-notification":
+        return (
+          <>
+            <span className="text-rose-600 font-black">🚨 Instant Alert</span>
+            <span className="text-slate-600">New Hot Lead</span>
+          </>
+        );
+      case "payment-creation":
+        return (
+          <>
+            <span className="text-emerald-600 font-black">🟢 Payment Received</span>
+            <span className="text-slate-600">Won Marked</span>
+          </>
+        );
+      case "hour-by-hour-report":
+        return (
+          <>
+            <span className="text-amber-500 font-black">⏰ 48 Peak Calls</span>
+            <span className="text-slate-600">Shift #1 High</span>
+          </>
+        );
+      default:
+        return (
+          <>
+            <span className="text-[#6C5CE7] font-black">🚀 TeleCRM</span>
+            <span className="text-slate-600">Ready</span>
+          </>
+        );
+    }
+  };
 
-        {/* 3. Micro-UI Screen Content */}
-        {isWhatsApp ? (
-          /* WhatsApp Micro-UI Screen */
-          <div className="space-y-2.5 pt-1">
-            {/* Header */}
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-              <div className="size-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] font-black">
-                W
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold truncate text-white">WhatsApp Broadcast</p>
-                <p className="text-[9px] text-emerald-400 font-medium font-mono">500 Leads • 98.4% Delivered</p>
-              </div>
-            </div>
-
-            {/* Chat Bubble with Brochure */}
-            <div className="bg-emerald-950/60 border border-emerald-500/20 rounded-2xl rounded-tl-none p-2.5 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-[10px] text-emerald-300 font-semibold">
-                <FileText className="size-3 text-emerald-400" />
-                <span className="truncate">Bandra_3BHK_Brochure.pdf</span>
-              </div>
-              <p className="text-[10px] text-slate-200 leading-snug">
-                Hi {feature.mockup.callerName || "there"}! Here is your requested price list.
-              </p>
-              <div className="flex items-center justify-end gap-1 text-[8px] text-emerald-400 font-mono">
-                <span>12:45 PM</span>
-                <span>✓✓</span>
-              </div>
-            </div>
-
-            {/* Reply pill */}
-            <div className="bg-slate-900 rounded-xl p-2 text-[9px] text-slate-300 flex items-center justify-between border border-slate-800 font-medium">
-              <span className="truncate">&quot;Interested! Call me at 4 PM&quot;</span>
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-            </div>
-          </div>
-        ) : isAnalytics ? (
-          /* Leaderboard & Reports Micro-UI Screen */
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px]">
-              <span className="font-extrabold text-amber-400 flex items-center gap-1">
-                <Trophy className="size-3 text-amber-400" /> {feature.heading}
-              </span>
-              <span className="text-[9px] text-slate-400 font-mono">Today</span>
-            </div>
-
-            {/* Top 3 Caller Cards */}
-            <div className="space-y-1">
-              {[
-                { rank: "🥇", name: "Aarav Sharma", score: "142 Calls", rev: "₹1.35L" },
-                { rank: "🥈", name: "Priya Patel", score: "128 Calls", rev: "₹98K" },
-                { rank: "🥉", name: "Rohan Verma", score: "94 Calls", rev: "₹84K" },
-              ].map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-[10px]"
-                >
-                  <span className="font-bold flex items-center gap-1 text-[10px]">
-                    <span>{r.rank}</span>
-                    <span className="text-white truncate max-w-[90px]">{r.name}</span>
-                  </span>
-                  <span className="text-emerald-400 font-mono font-bold text-[9px]">{r.score}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Shift Target Bar */}
-            <div className="pt-1">
-              <div className="flex justify-between text-[9px] text-slate-400 mb-1 font-medium">
-                <span>Daily Quota (500 Calls)</span>
-                <span className="text-emerald-400 font-bold font-mono">89%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-[#6C5CE7] to-emerald-400 rounded-full w-[89%]" />
-              </div>
-            </div>
-          </div>
-        ) : isAutomation ? (
-          /* Smart Workflows & Lead Routing Micro-UI Screen */
-          <div className="space-y-2 pt-1">
-            <div className="text-[10px] font-bold text-[#6C5CE7] flex items-center gap-1 pb-1 border-b border-slate-800">
-              <Zap className="size-3 text-[#6C5CE7]" /> {feature.heading}
-            </div>
-
-            {/* Node 1: Trigger */}
-            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 text-[10px] space-y-0.5">
-              <div className="text-slate-400 text-[8px] uppercase font-bold">1. Ingest Trigger</div>
-              <p className="text-white font-semibold truncate">Meta Lead Ad Form Ingest</p>
-            </div>
-
-            {/* Connector */}
-            <div className="text-center text-[#6C5CE7] text-[9px] font-bold font-mono">↓ 0.2s sync</div>
-
-            {/* Node 2: Action */}
-            <div className="bg-indigo-950/60 p-2 rounded-xl border border-indigo-500/30 text-[10px] space-y-0.5">
-              <div className="text-indigo-400 text-[8px] uppercase font-bold">2. Auto Allocation</div>
-              <p className="text-indigo-200 font-semibold truncate">Round-Robin ➔ Agent Desk</p>
-            </div>
-          </div>
-        ) : (
-          /* 1-Click Dialer & Live Calling Micro-UI Screen */
+  // Bespoke Micro-UI screen for all 19 features
+  const renderScreenContent = () => {
+    switch (feature.id) {
+      case "1-click-dialer":
+        return (
           <div className="space-y-2.5 pt-1 text-center">
             <div className="space-y-0.5">
               <div className="size-10 rounded-full bg-gradient-to-tr from-[#6C5CE7] to-indigo-400 flex items-center justify-center text-white text-xs font-black mx-auto shadow-md">
-                AS
+                MM
               </div>
-              <h5 className="text-xs font-black text-white truncate">{feature.mockup.callerName}</h5>
-              <p className="text-[10px] font-mono text-slate-400">{feature.mockup.phone}</p>
+              <h5 className="text-xs font-black text-white truncate">Md Minhaj</h5>
+              <p className="text-[10px] font-mono text-slate-400">+91 79821 23254</p>
             </div>
-
-            {/* Audio Waveform Simulator */}
             <div className="flex items-center justify-center gap-1 h-5">
-              {[4, 8, 14, 18, 10, 16, 20, 12, 6, 14, 8].map((h, i) => (
+              {[4, 10, 16, 20, 12, 18, 14, 8, 16, 6].map((h, i) => (
                 <span
                   key={i}
                   className="w-1 bg-emerald-400 rounded-full animate-pulse"
@@ -528,13 +695,10 @@ function FeatureVisualMockup({ feature }: { feature: Feature }) {
                 />
               ))}
             </div>
-
             <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono text-emerald-400 bg-emerald-950/40 py-0.5 px-2.5 rounded-full border border-emerald-500/20 w-fit mx-auto">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-              <span>02:45 In Call</span>
+              <span>01:48 In Call</span>
             </div>
-
-            {/* 1-Tap Outcome Buttons */}
             <div className="grid grid-cols-3 gap-1 pt-1">
               <div className="bg-emerald-600/30 border border-emerald-500/30 p-1.5 rounded-lg text-emerald-300 text-[8px] font-bold text-center">
                 Connected
@@ -547,32 +711,541 @@ function FeatureVisualMockup({ feature }: { feature: Feature }) {
               </div>
             </div>
           </div>
-        )}
+        );
+
+      case "leaderboard-report":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-amber-400 flex items-center gap-1">
+                <Trophy className="size-3 text-amber-400" /> Sales Leaderboard
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">Live</span>
+            </div>
+            <div className="space-y-1">
+              {[
+                { rank: "🥇", name: "Aarav Sharma", calls: "142", rev: "₹1.35L" },
+                { rank: "🥈", name: "Priya Patel", calls: "128", rev: "₹98K" },
+                { rank: "🥉", name: "Rohan Verma", calls: "94", rev: "₹84K" },
+              ].map((r, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-[9px]"
+                >
+                  <span className="font-bold flex items-center gap-1">
+                    <span>{r.rank}</span>
+                    <span className="text-white truncate max-w-[85px]">{r.name}</span>
+                  </span>
+                  <div className="text-right">
+                    <span className="text-amber-400 font-bold font-mono">{r.calls} calls</span>
+                    <span className="text-slate-400 text-[8px] block font-mono">{r.rev}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="pt-0.5">
+              <div className="flex justify-between text-[8px] text-slate-400 mb-0.5">
+                <span>Team Target</span>
+                <span className="text-emerald-400 font-bold font-mono">89%</span>
+              </div>
+              <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full w-[89%]" />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "whatsapp-broadcast-marketing":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-1.5 pb-1.5 border-b border-slate-800">
+              <div className="size-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[9px] font-black">
+                W
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold truncate text-white">Broadcast: Festive Launch</p>
+                <p className="text-[8px] text-emerald-400 font-mono">500 Leads • 98.4% Delivered</p>
+              </div>
+            </div>
+            <div className="bg-emerald-950/60 border border-emerald-500/20 rounded-xl rounded-tl-none p-2 space-y-1">
+              <div className="flex items-center gap-1 text-[9px] text-emerald-300 font-semibold">
+                <FileText className="size-2.5 text-emerald-400" />
+                <span className="truncate">Luxury_3BHK_Brochure.pdf</span>
+              </div>
+              <p className="text-[9px] text-slate-200 leading-snug">
+                Hi Rajesh! Here is the pricing &amp; layout plan for Bandra.
+              </p>
+              <div className="flex items-center justify-end gap-1 text-[7px] text-emerald-400 font-mono">
+                <span>12:45 PM</span>
+                <span>✓✓</span>
+              </div>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-1.5 text-[8px] text-slate-300 flex items-center justify-between border border-slate-800">
+              <span className="truncate">&quot;Interested! Call me at 4 PM&quot;</span>
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            </div>
+          </div>
+        );
+
+      case "call-reminders":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-rose-400 flex items-center gap-1">
+                <Bell className="size-3 text-rose-400" /> Scheduled Follow-Up
+              </span>
+              <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded-full font-bold">
+                Due 15m
+              </span>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white">Dr. Suresh Rao</span>
+                <span className="text-[8px] text-amber-400 font-mono font-bold">🔥 High Intent</span>
+              </div>
+              <p className="text-[9px] text-slate-400">Scheduled: Today 2:30 PM • 3BHK Inquiry</p>
+              <p className="text-[8px] text-slate-300 italic">&quot;Requested call after clinic hours&quot;</p>
+            </div>
+            <button className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-1.5 rounded-lg text-[9px] flex items-center justify-center gap-1 shadow-md">
+              <PhoneCall className="size-2.5" /> Call Dr. Suresh Now
+            </button>
+          </div>
+        );
+
+      case "sales-report":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                <BarChart3 className="size-3 text-emerald-400" /> Pipeline &amp; Revenue
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">Q3 Log</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-center">
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                <span className="text-[8px] text-slate-400 block">Total Closed</span>
+                <span className="text-xs font-black text-emerald-400 font-mono">₹4,85,000</span>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                <span className="text-[8px] text-slate-400 block">Deals Won</span>
+                <span className="text-xs font-black text-white font-mono">24 Deals</span>
+              </div>
+            </div>
+            <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800 space-y-1">
+              <div className="flex justify-between text-[8px] text-slate-300">
+                <span>Leads (100) ➔ Won (24)</span>
+                <span className="text-emerald-400 font-bold font-mono">24% Win Rate</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800 rounded-full flex overflow-hidden">
+                <div className="bg-[#6C5CE7] w-[45%]" />
+                <div className="bg-amber-400 w-[31%]" />
+                <div className="bg-emerald-400 w-[24%]" />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "smart-workflows":
+        return (
+          <div className="space-y-1.5 pt-1 text-[9px]">
+            <div className="text-[10px] font-bold text-[#6C5CE7] flex items-center gap-1 pb-1 border-b border-slate-800">
+              <Zap className="size-3 text-[#6C5CE7]" /> Workflow: Instant Lead Route
+            </div>
+            <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 space-y-0.5">
+              <div className="text-slate-400 text-[7px] uppercase font-bold">1. Trigger Event</div>
+              <p className="text-white font-semibold truncate">Meta Lead Ad Form Submitted</p>
+            </div>
+            <div className="text-center text-[#6C5CE7] text-[8px] font-mono font-bold leading-none">↓ 0.2s</div>
+            <div className="bg-indigo-950/60 p-1.5 rounded-lg border border-indigo-500/30 space-y-0.5">
+              <div className="text-indigo-400 text-[7px] uppercase font-bold">2. Auto Allocation</div>
+              <p className="text-indigo-200 font-semibold truncate">Round-Robin ➔ Priya Patel</p>
+            </div>
+            <div className="text-center text-emerald-400 text-[8px] font-mono font-bold leading-none">↓ Instant</div>
+            <div className="bg-emerald-950/60 p-1.5 rounded-lg border border-emerald-500/30 space-y-0.5">
+              <div className="text-emerald-400 text-[7px] uppercase font-bold">3. Auto WhatsApp</div>
+              <p className="text-emerald-200 font-semibold truncate">Brochure PDF Dispatched</p>
+            </div>
+          </div>
+        );
+
+      case "automatic-call-recording":
+        return (
+          <div className="space-y-2 pt-1 text-center">
+            <div className="space-y-0.5">
+              <div className="size-9 rounded-full bg-purple-600/40 border border-purple-400/40 flex items-center justify-center text-purple-300 text-xs font-black mx-auto">
+                <Mic className="size-4 text-purple-300" />
+              </div>
+              <h5 className="text-xs font-bold text-white">Ananya Patel</h5>
+              <p className="text-[9px] text-slate-400 font-mono">03:45 / 04:12 • High Quality</p>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-center gap-1 h-5">
+                {[3, 8, 14, 20, 16, 12, 18, 14, 8, 16, 10, 4].map((h, i) => (
+                  <span
+                    key={i}
+                    className="w-1 bg-[#6C5CE7] rounded-full"
+                    style={{ height: `${h}px` }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-between text-[8px] text-slate-400 pt-0.5">
+                <span className="bg-slate-800 px-1.5 py-0.5 rounded text-white font-mono">1.5x</span>
+                <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                  <CheckCircle className="size-2.5" /> Synced to Cloud
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "agents-report":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-blue-400 flex items-center gap-1">
+                <Users className="size-3 text-blue-400" /> Agent Scorecard
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">Aarav S.</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-center">
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                <span className="text-[8px] text-slate-400 block">Talk Time</span>
+                <span className="text-xs font-black text-white font-mono">3h 24m</span>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800">
+                <span className="text-[8px] text-slate-400 block">Connected</span>
+                <span className="text-xs font-black text-emerald-400 font-mono">48 / 52</span>
+              </div>
+            </div>
+            <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between text-[9px]">
+              <span className="text-slate-300">Quality QA Score</span>
+              <span className="text-amber-400 font-bold font-mono">⭐ 4.9 / 5.0</span>
+            </div>
+          </div>
+        );
+
+      case "bulk-edit":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-blue-400 flex items-center gap-1">
+                <Edit3 className="size-3 text-blue-400" /> Bulk Action Drawer
+              </span>
+              <span className="text-[8px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full font-bold">
+                142 Selected
+              </span>
+            </div>
+            <div className="space-y-1">
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between text-[9px]">
+                <span className="text-slate-300">Assign Caller:</span>
+                <span className="text-indigo-400 font-bold">Rohan Verma</span>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between text-[9px]">
+                <span className="text-slate-300">Set Stage:</span>
+                <span className="text-emerald-400 font-bold">Contacted</span>
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between text-[9px]">
+                <span className="text-slate-300">Apply Tag:</span>
+                <span className="text-amber-400 font-bold">#FestiveCampaign</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "excel-import":
+        return (
+          <div className="space-y-2 pt-1 text-[9px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                <FileSpreadsheet className="size-3 text-emerald-400" /> Excel Spreadsheet
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">1,250 Rows</span>
+            </div>
+            <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+              <div className="grid grid-cols-3 bg-slate-800/80 p-1 font-bold text-[8px] text-slate-300 border-b border-slate-700">
+                <span>Name</span>
+                <span>Phone</span>
+                <span>City</span>
+              </div>
+              <div className="p-1 space-y-1 font-mono text-[7px] text-slate-300">
+                <div className="grid grid-cols-3">
+                  <span className="truncate">Aditya Roy</span>
+                  <span>98201...</span>
+                  <span>Mumbai</span>
+                </div>
+                <div className="grid grid-cols-3">
+                  <span className="truncate">Megha Gupta</span>
+                  <span>97112...</span>
+                  <span>Delhi</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-emerald-950/60 p-1 rounded border border-emerald-500/30 text-emerald-300 text-[8px] flex items-center justify-between">
+              <span>✓ Auto De-duplication</span>
+              <span className="font-mono font-bold">0 Duplicates</span>
+            </div>
+          </div>
+        );
+
+      case "fb-lead-capture":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-blue-400 flex items-center gap-1">
+                <Share2 className="size-3 text-blue-400" /> Meta / FB Lead Ingest
+              </span>
+              <span className="text-[8px] text-emerald-400 font-mono">0.2s</span>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1 text-[9px]">
+              <div className="flex justify-between items-center">
+                <span className="text-white font-bold">Vikram Singh</span>
+                <span className="text-[8px] bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded font-bold">Instagram Ad</span>
+              </div>
+              <p className="text-[8px] text-slate-400">Campaign: 3BHK Luxury Bandra Villas</p>
+              <div className="pt-1 flex items-center justify-between border-t border-slate-800 text-[8px]">
+                <span className="text-emerald-400">⚡ Auto-Assigned: Rohan</span>
+                <span className="text-slate-400 font-mono">Just Now</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "custom-api-integration":
+        return (
+          <div className="space-y-1.5 pt-1 text-[8px] font-mono">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[9px] font-sans">
+              <span className="font-extrabold text-cyan-400 flex items-center gap-1">
+                <Webhook className="size-3 text-cyan-400" /> REST API Webhook
+              </span>
+              <span className="text-emerald-400 font-bold font-mono">200 OK</span>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 space-y-1 text-slate-300">
+              <span className="text-cyan-400 block font-bold">POST /v1/leads/ingest</span>
+              <p className="text-slate-400">
+                &#123;<br />
+                &nbsp;&nbsp;&quot;name&quot;: &quot;Aditya&quot;,<br />
+                &nbsp;&nbsp;&quot;source&quot;: &quot;Website&quot;,<br />
+                &nbsp;&nbsp;&quot;status&quot;: &quot;assigned&quot;<br />
+                &#125;
+              </p>
+            </div>
+          </div>
+        );
+
+      case "lead-routing":
+        return (
+          <div className="space-y-2 pt-1 text-[9px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-purple-400 flex items-center gap-1">
+                <GitFork className="size-3 text-purple-400" /> Round-Robin Router
+              </span>
+              <span className="text-[8px] text-emerald-400 font-mono">Active</span>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1.5 text-center">
+              <span className="text-slate-400 text-[8px] block">Incoming Lead #842 (Housing.com)</span>
+              <div className="grid grid-cols-3 gap-1 text-[8px]">
+                <div className="bg-indigo-950 p-1 rounded border border-indigo-500/30 text-indigo-200">
+                  Aarav (33%)
+                </div>
+                <div className="bg-purple-950 p-1 rounded border border-purple-500/30 text-purple-200 font-bold ring-1 ring-purple-400">
+                  Priya (33%) ✓
+                </div>
+                <div className="bg-indigo-950 p-1 rounded border border-indigo-500/30 text-indigo-200">
+                  Sneha (34%)
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "whatsapp-alerts":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                <MessageSquare className="size-3 text-emerald-400" /> Client Notification
+              </span>
+              <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-bold">
+                WhatsApp
+              </span>
+            </div>
+            <div className="bg-emerald-950/60 p-2 rounded-xl border border-emerald-500/30 space-y-1 text-[9px]">
+              <p className="text-emerald-200 font-semibold">
+                ⚡ Site Visit Confirmed!
+              </p>
+              <p className="text-[8px] text-slate-300 leading-snug">
+                Your visit to Bandra Palms is scheduled for Sunday 11:00 AM.
+              </p>
+              <div className="text-right text-[7px] text-emerald-400 font-mono">11:02 AM ✓✓</div>
+            </div>
+          </div>
+        );
+
+      case "1-click-whatsapp":
+        return (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                <Smartphone className="size-3 text-emerald-400" /> 1-Click WhatsApp
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">+91 98450...</span>
+            </div>
+            <div className="space-y-1 text-[8px]">
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between hover:border-emerald-500 cursor-pointer">
+                <span className="text-slate-200">📋 Send Price List &amp; Floorplans</span>
+                <Send className="size-2.5 text-emerald-400" />
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between hover:border-emerald-500 cursor-pointer">
+                <span className="text-slate-200">📍 Share Google Maps Location</span>
+                <Send className="size-2.5 text-emerald-400" />
+              </div>
+              <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 flex items-center justify-between hover:border-emerald-500 cursor-pointer">
+                <span className="text-slate-200">📄 Send Booking Application PDF</span>
+                <Send className="size-2.5 text-emerald-400" />
+              </div>
+            </div>
+          </div>
+        );
+
+      case "1-click-sms-email":
+        return (
+          <div className="space-y-2 pt-1 text-[9px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-indigo-400 flex items-center gap-1">
+                <Mail className="size-3 text-indigo-400" /> Omnichannel Dispatch
+              </span>
+              <div className="flex gap-1 text-[7px] font-bold">
+                <span className="bg-indigo-600 text-white px-1 py-0.5 rounded">SMS</span>
+                <span className="bg-slate-800 text-slate-300 px-1 py-0.5 rounded">Email</span>
+              </div>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[8px] text-slate-400 block font-mono">Template #04 • Booking Confirmation</span>
+              <p className="text-slate-200 text-[8px] leading-snug">
+                Dear Rahul, your token booking #891 is confirmed for Flat 402.
+              </p>
+              <span className="text-[7px] text-emerald-400 block font-mono text-right">✓ Delivered</span>
+            </div>
+          </div>
+        );
+
+      case "push-notification":
+        return (
+          <div className="space-y-1.5 pt-1 text-[8px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-rose-400 flex items-center gap-1">
+                <BellRing className="size-3 text-rose-400" /> Push Notifications
+              </span>
+              <span className="text-[8px] text-slate-400">Lock Screen</span>
+            </div>
+            <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800 space-y-0.5">
+              <div className="flex justify-between text-white font-bold">
+                <span>🔥 New Lead Assigned</span>
+                <span className="text-[7px] text-slate-400">2m ago</span>
+              </div>
+              <p className="text-slate-300">Facebook Lead: Vikram Singh • Bandra</p>
+            </div>
+            <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800 space-y-0.5">
+              <div className="flex justify-between text-white font-bold">
+                <span>⏰ Follow-up Due</span>
+                <span className="text-[7px] text-slate-400">5m ago</span>
+              </div>
+              <p className="text-slate-300">Call Dr. Suresh Rao regarding quotation</p>
+            </div>
+          </div>
+        );
+
+      case "payment-creation":
+        return (
+          <div className="space-y-2 pt-1 text-[9px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-emerald-400 flex items-center gap-1">
+                <CreditCard className="size-3 text-emerald-400" /> UPI Payment Link
+              </span>
+              <span className="text-[8px] text-slate-400 font-mono">Invoice #901</span>
+            </div>
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-1 text-center">
+              <span className="text-slate-400 text-[8px] block">Token Booking Amount</span>
+              <div className="text-sm font-black text-emerald-400 font-mono">₹15,000.00</div>
+              <div className="bg-emerald-500/20 text-emerald-300 text-[8px] py-0.5 px-2 rounded-full font-bold w-fit mx-auto">
+                ✓ Paid via UPI (GPay)
+              </div>
+            </div>
+          </div>
+        );
+
+      case "hour-by-hour-report":
+        return (
+          <div className="space-y-2 pt-1 text-[9px]">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[10px]">
+              <span className="font-extrabold text-amber-400 flex items-center gap-1">
+                <Clock className="size-3 text-amber-400" /> Hourly Call Output
+              </span>
+              <span className="text-[8px] text-amber-300 font-mono font-bold">Peak: 2 PM</span>
+            </div>
+            <div className="flex items-end justify-between gap-1 h-14 bg-slate-900 p-2 rounded-xl border border-slate-800">
+              {[
+                { time: "9 AM", h: "30%", val: "14" },
+                { time: "11 AM", h: "60%", val: "28" },
+                { time: "2 PM", h: "95%", val: "48", peak: true },
+                { time: "4 PM", h: "75%", val: "36" },
+                { time: "6 PM", h: "40%", val: "20" },
+              ].map((bar, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end">
+                  <span className="text-[7px] text-slate-400 font-mono">{bar.val}</span>
+                  <div
+                    className={`w-full rounded-t ${
+                      bar.peak ? "bg-amber-400" : "bg-[#6C5CE7]"
+                    }`}
+                    style={{ height: bar.h }}
+                  />
+                  <span className="text-[6px] text-slate-400 truncate">{bar.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="space-y-2.5 pt-1 text-center">
+            <h5 className="text-xs font-bold text-white">{feature.title}</h5>
+            <p className="text-[9px] text-slate-400">{feature.subheading}</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="relative flex items-center justify-center p-2 sm:p-4">
+      {/* 1. Ambient Backdrop Blob */}
+      <div
+        className={`absolute -inset-4 bg-gradient-to-tr ${getBlobGradient(
+          feature.id
+        )} rounded-full blur-2xl -z-10 pointer-events-none transform -rotate-6`}
+      />
+
+      {/* 4A. Floating Popover Badge - Top Right */}
+      <div className="absolute -top-2 -right-2 sm:-right-4 bg-white/95 backdrop-blur-md shadow-xl border border-slate-100/90 rounded-2xl p-2 sm:p-2.5 text-[10px] font-extrabold text-slate-800 flex items-center gap-1.5 z-20 shadow-indigo-950/10 animate-in fade-in">
+        {renderTopBadge()}
+      </div>
+
+      {/* 2. Device Bezel (Phone Frame) */}
+      <div className="relative w-60 sm:w-68 rounded-[2.75rem] border-[6px] border-slate-900 bg-slate-950 shadow-2xl p-3.5 space-y-2.5 z-10 overflow-hidden text-white min-h-[220px] flex flex-col justify-between">
+        {/* Inner Camera Pill / Speaker Notch */}
+        <div>
+          <div className="w-20 h-3.5 bg-slate-900 rounded-b-xl mx-auto -mt-3.5 mb-2 flex items-center justify-center">
+            <div className="size-1.5 rounded-full bg-slate-800" />
+          </div>
+
+          {/* 3. Micro-UI Screen Content */}
+          {renderScreenContent()}
+        </div>
       </div>
 
       {/* 4B. Floating Popover Badge - Bottom Left */}
       <div className="absolute -bottom-2 -left-2 sm:-left-4 bg-white/95 backdrop-blur-md shadow-xl border border-slate-100/90 rounded-2xl p-2 sm:p-2.5 text-[10px] font-extrabold text-slate-800 flex items-center gap-1.5 z-20 shadow-indigo-950/10 animate-in fade-in">
-        {isWhatsApp ? (
-          <>
-            <span className="text-emerald-600 font-black">💬 WhatsApp</span>
-            <span className="text-slate-600">Brochure Sent</span>
-          </>
-        ) : isAnalytics ? (
-          <>
-            <span className="text-emerald-600 font-black">📈 ₹4.85L</span>
-            <span className="text-slate-600">Closed</span>
-          </>
-        ) : isAutomation ? (
-          <>
-            <span className="text-cyan-600 font-black">🎯 Round-Robin</span>
-            <span className="text-slate-600">Assigned</span>
-          </>
-        ) : (
-          <>
-            <span className="text-[#6C5CE7] font-black">🎙️ HD Cloud</span>
-            <span className="text-slate-600">Audio Synced</span>
-          </>
-        )}
+        {renderBottomBadge()}
       </div>
     </div>
   );
