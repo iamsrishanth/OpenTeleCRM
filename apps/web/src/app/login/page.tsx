@@ -13,7 +13,6 @@ import {
   Building,
   Key,
   CheckCircle2,
-  UserPlus,
   MailCheck,
   ChevronDown,
   ArrowLeft,
@@ -184,15 +183,6 @@ export default function LoginPage() {
                 )}
               </Button>
 
-              <div className="text-center">
-                <Link
-                  href="/signup"
-                  className="text-[11px] font-bold text-[#6C5CE7] hover:underline inline-flex items-center gap-1"
-                >
-                  <UserPlus className="size-3" />
-                  <span>Register Company / Workspace (/signup) →</span>
-                </Link>
-              </div>
             </div>
           </div>
 
