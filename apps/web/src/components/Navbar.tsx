@@ -54,7 +54,7 @@ import {
 const TEAM_SIZES = ["1 - 5 members", "6 - 15 members", "16 - 50 members", "50+ members"];
 
 export default function Navbar() {
-  const { isReady, token } = useAuth();
+  const { isReady, token, userRole } = useAuth();
   const [showFeatures, setShowFeatures] = useState(false);
   const [showMoreFeatures, setShowMoreFeatures] = useState(false);
 
@@ -423,11 +423,20 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {isReady && token ? (
               <Link
-                href="/dashboard"
+                href={userRole === 'agent' ? '/agent' : '/dashboard'}
                 className="bg-indigo-50 text-[#6C5CE7] hover:bg-indigo-100 font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl border border-indigo-200/60"
               >
-                <LayoutDashboard className="w-4 h-4 text-[#6C5CE7]" />
-                Dashboard
+                {userRole === 'agent' ? (
+                  <>
+                    <Headphones className="w-4 h-4 text-[#6C5CE7]" />
+                    Calling Desk
+                  </>
+                ) : (
+                  <>
+                    <LayoutDashboard className="w-4 h-4 text-[#6C5CE7]" />
+                    Dashboard
+                  </>
+                )}
               </Link>
             ) : (
               <Link

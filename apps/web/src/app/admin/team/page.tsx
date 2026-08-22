@@ -253,7 +253,7 @@ export default function AdminTeamPage() {
   if (!isReady || !token) return <LoadingScreen label="Checking session…" />
 
   return (
-    <AppShell>
+    <AppShell requiredRole="admin">
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

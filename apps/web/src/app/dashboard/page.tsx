@@ -114,7 +114,7 @@ export default function DashboardPage() {
   if (!isReady || !token) return <LoadingScreen label="Checking session…" />
 
   return (
-    <AppShell>
+    <AppShell requiredRole="admin">
       <div className="space-y-6">
         {/* Quick actions bar */}
         <div className="flex flex-wrap items-center justify-between gap-3">

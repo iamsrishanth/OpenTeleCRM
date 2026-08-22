@@ -50,41 +50,15 @@ export default function Footer() {
 
   return (
     <>
-      <footer className="relative bg-[#1A0B3E] text-white pt-24 pb-12 overflow-hidden mt-20">
-        {/* Top Wave Svg Transition */}
-        <div className="absolute top-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none -translate-y-[98%]">
-          <svg
-            className="relative block w-full h-16 sm:h-24 md:h-32 text-[#1A0B3E]"
-            viewBox="0 0 1200 120"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M0,0 C150,90 350,-40 500,45 C650,130 900,10 1200,50 L1200,120 L0,120 Z"
-              fill="currentColor"
-            />
-          </svg>
-        </div>
-
-        {/* Floating Top Banner Card */}
-        <div className="relative max-w-4xl mx-auto px-4 -mt-36 sm:-mt-40 mb-12 z-20">
-          <div className="bg-white rounded-3xl shadow-2xl shadow-indigo-950/40 p-6 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 border border-slate-100">
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight text-center sm:text-left">
-              Try it now!
-            </h2>
-            <button
-              onClick={openDemoModal}
-              className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold px-8 py-4 rounded-2xl shadow-lg shadow-indigo-500/25 transition-all transform hover:-translate-y-0.5 active:scale-95 cursor-pointer text-sm"
-            >
-              Request a demo
-            </button>
-          </div>
-        </div>
-
-        {/* 15 Days Refund Policy Subtitle */}
-        <div className="text-center mb-14 px-4">
+      <footer className="relative bg-[#1A0B3E] text-white pt-16 pb-12 border-t border-indigo-900/40 mt-16">
+        {/* 15 Days Refund Policy Header */}
+        <div className="text-center mb-12 px-4">
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-wide">
             15 Days Refund Policy
           </h3>
+          <p className="text-xs text-slate-300 mt-1 max-w-md mx-auto">
+            100% risk-free trial with guaranteed money back if you aren&apos;t completely satisfied.
+          </p>
         </div>
 
         {/* Main Footer 4-Column Grid */}
