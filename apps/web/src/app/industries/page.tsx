@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
   LucideIcon,
+  ArrowRight,
   Building2,
   GraduationCap,
   Plane,
@@ -498,12 +500,13 @@ export default function IndustriesPage() {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col items-center gap-3 pt-2">
-                    <button
-                      onClick={() => openDemoModal(industry.title)}
-                      className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-3.5 px-8 rounded-xl text-sm shadow-md transition cursor-pointer active:scale-95"
+                    <Link
+                      href={`/industries/details#${industry.id}`}
+                      className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-3.5 px-8 rounded-xl text-sm shadow-md transition cursor-pointer active:scale-95 inline-flex items-center gap-2 group"
                     >
-                      Request a demo
-                    </button>
+                      <span>See more</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
                     <button className="flex items-center gap-1.5 text-slate-700 hover:text-[#6C5CE7] text-xs font-bold transition cursor-pointer">
                       <PlayCircle className="w-4 h-4 text-[#6C5CE7]" />
                       <span className="underline">Watch video</span>
