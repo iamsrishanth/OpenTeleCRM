@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -61,36 +62,42 @@ const FEATURES = [
   {
     icon: PhoneCall,
     title: "1-Click Auto Dialer",
+    href: "/features#1-click-dialer",
     description:
       "Eliminate manual dialing. Your team can call up to 300+ leads daily directly from their smartphones with automated queueing.",
   },
   {
     icon: MessageSquare,
     title: "WhatsApp Automation",
+    href: "/features#whatsapp-broadcast-marketing",
     description:
       "Send instant welcome messages, property brochures, or quotes on WhatsApp immediately after every call with custom templates.",
   },
   {
     icon: BarChart3,
     title: "Live Reports & Leaderboards",
+    href: "/features#leaderboard-report",
     description:
       "Track total calls, talk time, lead conversion ratios, and daily team performance with real-time visual dashboards.",
   },
   {
     icon: Users,
-    title: "Lead Management",
+    title: "Lead Management & Routing",
+    href: "/features#lead-routing",
     description:
       "Organize, filter, and track leads effortlessly from capturing to closing across all pipeline stages.",
   },
   {
     icon: CheckCircle2,
     title: "Automatic Call Recording",
+    href: "/features#automatic-call-recording",
     description:
       "Record all incoming and outgoing sales calls automatically and store them securely on the cloud for training and QA.",
   },
   {
     icon: Zap,
-    title: "Automatic Lead Routing",
+    title: "Smart Workflows & API",
+    href: "/features#smart-workflows",
     description:
       "Distribute incoming leads evenly among your telecalling agents or route them based on location, budget, or custom criteria.",
   },
@@ -192,10 +199,16 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <button
               onClick={() => openDemoModal("Hero - Book Demo Call")}
-              className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-4 px-8 rounded-2xl text-sm shadow-xl shadow-indigo-500/20 transition cursor-pointer"
+              className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-4 px-8 rounded-2xl text-sm shadow-xl shadow-indigo-500/20 transition cursor-pointer active:scale-95"
             >
               Book Demo call
             </button>
+            <Link
+              href="/features"
+              className="bg-white hover:bg-slate-50 text-slate-800 font-extrabold py-4 px-8 rounded-2xl text-sm border border-slate-200 shadow-sm transition flex items-center gap-1.5"
+            >
+              Explore All Features <ArrowRight className="w-4 h-4 text-[#6C5CE7]" />
+            </Link>
           </div>
         </div>
       </section>
@@ -207,12 +220,12 @@ export default function Home() {
             Trusted by Indian sales teams who sell to Indian customers
           </p>
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 opacity-70 grayscale hover:grayscale-0 transition-all duration-300">
-            <span className="text-xl font-black text-slate-800">Domino's</span>
-            <span className="text-xl font-black text-slate-800">BYJU'S</span>
+            <span className="text-xl font-black text-slate-800">Domino&apos;s</span>
+            <span className="text-xl font-black text-slate-800">BYJU&apos;S</span>
             <span className="text-xl font-black text-slate-800">Mercedes-Benz</span>
             <span className="text-xl font-black text-slate-800">CELLBELL</span>
             <span className="text-xl font-black text-slate-800">Shiprocket</span>
-            <span className="text-xl font-black text-slate-800">COX & KINGS</span>
+            <span className="text-xl font-black text-slate-800">COX &amp; KINGS</span>
           </div>
         </div>
       </section>
@@ -233,19 +246,34 @@ export default function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {FEATURES.map((feat, idx) => (
-            <div
+            <Link
               key={idx}
-              className="bg-white rounded-3xl border border-slate-200/80 p-8 space-y-4 shadow-sm hover:shadow-xl transition hover:-translate-y-1 duration-200"
+              href={feat.href}
+              className="bg-white rounded-3xl border border-slate-200/80 p-8 space-y-4 shadow-sm hover:shadow-xl hover:border-[#6C5CE7]/40 transition hover:-translate-y-1 duration-200 group block cursor-pointer"
             >
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#6C5CE7] flex items-center justify-center font-bold">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#6C5CE7] flex items-center justify-center font-bold group-hover:scale-105 group-hover:bg-[#6C5CE7] group-hover:text-white transition-all">
                 <feat.icon className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-extrabold text-slate-900">{feat.title}</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-extrabold text-slate-900 group-hover:text-[#6C5CE7] transition-colors">
+                  {feat.title}
+                </h3>
+                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#6C5CE7] group-hover:translate-x-1 transition-all" />
+              </div>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
                 {feat.description}
               </p>
-            </div>
+            </Link>
           ))}
+        </div>
+
+        <div className="text-center pt-2">
+          <Link
+            href="/features"
+            className="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-[#6C5CE7] font-black px-8 py-4 rounded-2xl text-sm transition border border-indigo-200/60 shadow-sm"
+          >
+            See All 20+ Sales Capabilities &amp; Features <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 

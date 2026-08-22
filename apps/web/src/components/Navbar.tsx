@@ -179,7 +179,7 @@ export default function Navbar() {
                     {/* Primary 5 Features */}
                     <div className="flex flex-col gap-2">
                       <Link 
-                        href="/features#auto-dialer" 
+                        href="/features#1-click-dialer" 
                         onClick={closeAllMenus} 
                         className="flex items-center gap-3 text-xs font-bold text-slate-800 hover:text-[#6C5CE7] hover:bg-indigo-50/60 p-2 rounded-xl transition"
                       >
@@ -190,7 +190,7 @@ export default function Navbar() {
                       </Link>
                       
                       <Link 
-                        href="/features#whatsapp-automation" 
+                        href="/features#whatsapp-broadcast-marketing" 
                         onClick={closeAllMenus} 
                         className="flex items-center gap-3 text-xs font-bold text-slate-800 hover:text-[#6C5CE7] hover:bg-indigo-50/60 p-2 rounded-xl transition"
                       >
@@ -198,35 +198,35 @@ export default function Navbar() {
                           <Bot className="w-4 h-4" />
                         </div>
                         <span className="flex items-center justify-between w-full">
-                          WhatsApp Automation
+                          WhatsApp Broadcast
                           <span className="bg-emerald-100 text-emerald-700 text-[9px] px-1.5 py-0.5 rounded-md font-extrabold">NEW</span>
                         </span>
                       </Link>
 
                       <Link 
-                        href="/features#reports" 
+                        href="/features#leaderboard-report" 
                         onClick={closeAllMenus} 
                         className="flex items-center gap-3 text-xs font-bold text-slate-800 hover:text-[#6C5CE7] hover:bg-indigo-50/60 p-2 rounded-xl transition"
                       >
                         <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-[#6C5CE7]">
                           <BarChart className="w-4 h-4" />
                         </div>
-                        <span>Live Reports & Leaderboards</span>
+                        <span>Leaderboard & Reports</span>
                       </Link>
 
                       <Link 
-                        href="/features#lead-management" 
+                        href="/features#lead-routing" 
                         onClick={closeAllMenus} 
                         className="flex items-center gap-3 text-xs font-bold text-slate-800 hover:text-[#6C5CE7] hover:bg-indigo-50/60 p-2 rounded-xl transition"
                       >
                         <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-[#6C5CE7]">
                           <Layers className="w-4 h-4" />
                         </div>
-                        <span>Lead Management</span>
+                        <span>Lead Routing & Tracking</span>
                       </Link>
 
                       <Link 
-                        href="/features#call-recording" 
+                        href="/features#automatic-call-recording" 
                         onClick={closeAllMenus} 
                         className="flex items-center gap-3 text-xs font-bold text-slate-800 hover:text-[#6C5CE7] hover:bg-indigo-50/60 p-2 rounded-xl transition"
                       >
@@ -242,7 +242,7 @@ export default function Navbar() {
                           onClick={closeAllMenus}
                           className="text-xs font-extrabold text-[#6C5CE7] hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          See all features →
+                          See all 20+ features →
                         </Link>
                       </div>
                     </div>
@@ -253,47 +253,38 @@ export default function Navbar() {
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 pb-1">
                           MORE FEATURES
                         </span>
-                        <Link href="/features#lead-routing" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Users className="w-3.5 h-3.5 text-[#6C5CE7]" /> Automatic Lead Routing
+                        <Link href="/features#smart-workflows" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Workflow className="w-3.5 h-3.5 text-[#6C5CE7]" /> Smart Workflows
                         </Link>
-                        <Link href="/features#follow-ups" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Zap className="w-3.5 h-3.5 text-[#6C5CE7]" /> Smart Follow-up Reminders
+                        <Link href="/features#call-reminders" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Zap className="w-3.5 h-3.5 text-[#6C5CE7]" /> Call Reminders
                         </Link>
-                        <Link href="/features#excel-upload" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <FileSpreadsheet className="w-3.5 h-3.5 text-[#6C5CE7]" /> Excel & CSV Upload
+                        <Link href="/features#excel-import" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-[#6C5CE7]" /> Excel & CSV Import
                         </Link>
-                        <Link href="/features#meta-ads" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Share2 className="w-3.5 h-3.5 text-[#6C5CE7]" /> Meta & FB Lead Ads Sync
+                        <Link href="/features#fb-lead-capture" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Share2 className="w-3.5 h-3.5 text-[#6C5CE7]" /> Facebook & Meta Lead Capture
                         </Link>
-                        <Link href="/features#call-history" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Clock className="w-3.5 h-3.5 text-[#6C5CE7]" /> Call History & Timelines
+                        <Link href="/features#custom-api-integration" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Database className="w-3.5 h-3.5 text-[#6C5CE7]" /> Custom API Integration
                         </Link>
-                        <Link href="/features#bulk-broadcast" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Send className="w-3.5 h-3.5 text-[#6C5CE7]" /> WhatsApp Bulk Broadcast
+                        <Link href="/features#whatsapp-alerts" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <MessageSquare className="w-3.5 h-3.5 text-[#6C5CE7]" /> WhatsApp Alerts
                         </Link>
-                        <Link href="/features#whatsapp-chatbot" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <MessageSquare className="w-3.5 h-3.5 text-[#6C5CE7]" /> WhatsApp Chatbot
+                        <Link href="/features#1-click-whatsapp" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Send className="w-3.5 h-3.5 text-[#6C5CE7]" /> 1-Click WhatsApp
                         </Link>
-                        <Link href="/features#integrations" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Database className="w-3.5 h-3.5 text-[#6C5CE7]" /> Website Integrations
+                        <Link href="/features#1-click-sms-email" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Mail className="w-3.5 h-3.5 text-[#6C5CE7]" /> 1-Click SMS & Email
                         </Link>
-                        <Link href="/features#analytics" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <PieChart className="w-3.5 h-3.5 text-[#6C5CE7]" /> Agent Performance Analytics
+                        <Link href="/features#push-notification" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <Clock className="w-3.5 h-3.5 text-[#6C5CE7]" /> Push Notifications
                         </Link>
-                        <Link href="/features#security" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Lock className="w-3.5 h-3.5 text-[#6C5CE7]" /> Role-Based Security
+                        <Link href="/features#payment-creation" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <CreditCard className="w-3.5 h-3.5 text-[#6C5CE7]" /> Payment Link Creation
                         </Link>
-                        <Link href="/features#workflows" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Workflow className="w-3.5 h-3.5 text-[#6C5CE7]" /> Custom Sales Workflows
-                        </Link>
-                        <Link href="/features#agent-monitoring" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Radio className="w-3.5 h-3.5 text-[#6C5CE7]" /> Live Agent Monitoring
-                        </Link>
-                        <Link href="/features#sim-calling" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Phone className="w-3.5 h-3.5 text-[#6C5CE7]" /> SIM-Based Calling Support
-                        </Link>
-                        <Link href="/features#custom-fields" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
-                          <Settings className="w-3.5 h-3.5 text-[#6C5CE7]" /> Custom Field Configuration
+                        <Link href="/features#hour-by-hour-report" onClick={closeAllMenus} className="flex items-center gap-2.5 text-xs font-bold text-slate-700 hover:text-[#6C5CE7] transition">
+                          <PieChart className="w-3.5 h-3.5 text-[#6C5CE7]" /> Hour-by-Hour Report
                         </Link>
                       </div>
                     )}
@@ -421,45 +412,21 @@ export default function Navbar() {
 
           {/* Action Call To Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            {isReady && token ? (
-              <Link
-                href={userRole === 'agent' ? '/agent' : '/dashboard'}
-                className="bg-indigo-50 text-[#6C5CE7] hover:bg-indigo-100 font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl border border-indigo-200/60"
-              >
-                {userRole === 'agent' ? (
-                  <>
-                    <Headphones className="w-4 h-4 text-[#6C5CE7]" />
-                    Calling Desk
-                  </>
-                ) : (
-                  <>
-                    <LayoutDashboard className="w-4 h-4 text-[#6C5CE7]" />
-                    Dashboard
-                  </>
-                )}
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="text-slate-700 hover:text-[#6C5CE7] font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl hover:bg-slate-50"
-              >
-                <LogIn className="w-4 h-4 text-slate-500" />
-                Login
-              </Link>
-            )}
-
+            <Link
+              href="/login"
+              className="text-slate-700 hover:text-[#6C5CE7] font-extrabold py-2.5 px-4 text-sm transition cursor-pointer flex items-center gap-1.5 rounded-xl hover:bg-slate-50 border border-slate-200/60"
+            >
+              <LogIn className="w-4 h-4 text-slate-500" />
+              Login
+            </Link>
             <button
               onClick={openDemoModal}
-              className="relative group overflow-hidden rounded-2xl bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-3 px-6 text-sm shadow-lg shadow-indigo-500/20 transition-all cursor-pointer active:scale-95"
+              className="bg-[#6C5CE7] hover:bg-[#5A4AD4] text-white font-extrabold py-2.5 px-5 text-sm transition shadow-md shadow-indigo-500/25 cursor-pointer flex items-center gap-1.5 rounded-xl active:scale-95"
             >
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                Request a demo
-              </span>
+              <Sparkles className="w-4 h-4" />
+              Request a demo
             </button>
           </div>
-
-          {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition"
@@ -485,23 +452,13 @@ export default function Navbar() {
             </div>
             
             <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-              {isReady && token ? (
-                <Link
-                  href="/dashboard"
-                  onClick={closeAllMenus}
-                  className="w-full bg-[#6C5CE7] text-white font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <LayoutDashboard className="w-4 h-4" /> Go to Dashboard
-                </Link>
-              ) : (
-                <Link
-                  href="/login"
-                  onClick={closeAllMenus}
-                  className="w-full bg-slate-100 text-slate-800 font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <LogIn className="w-4 h-4" /> Login to Portal
-                </Link>
-              )}
+              <Link
+                href="/login"
+                onClick={closeAllMenus}
+                className="w-full bg-slate-100 text-slate-800 font-extrabold py-3 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2 border border-slate-200"
+              >
+                <LogIn className="w-4 h-4" /> Login
+              </Link>
               <button
                 onClick={openDemoModal}
                 className="w-full bg-[#6C5CE7] text-white font-extrabold py-3 rounded-xl text-xs transition shadow-md cursor-pointer flex items-center justify-center gap-2"

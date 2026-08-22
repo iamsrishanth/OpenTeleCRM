@@ -148,48 +148,48 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2.5 text-xs text-slate-300 font-medium">
               <li>
-                <Link href="/features#auto-dialer" className="hover:text-white transition">
+                <Link href="/features#1-click-dialer" className="hover:text-white transition">
                   CRM with Dialer
                 </Link>
               </li>
               <li>
-                <Link href="/features#mobile-crm" className="hover:text-white transition">
+                <Link href="/features#1-click-dialer" className="hover:text-white transition">
                   Mobile CRM
                 </Link>
               </li>
               <li>
-                <Link href="/features#whatsapp-automation" className="hover:text-white transition">
+                <Link href="/features#whatsapp-broadcast-marketing" className="hover:text-white transition">
                   WhatsApp CRM
                 </Link>
               </li>
               <li>
-                <Link href="/features#meta-ads" className="hover:text-white transition">
+                <Link href="/features#fb-lead-capture" className="hover:text-white transition">
                   Facebook CRM
                 </Link>
               </li>
               <li>
-                <Link href="/features#call-management" className="hover:text-white transition">
+                <Link href="/features#call-reminders" className="hover:text-white transition">
                   Call Management Software
                 </Link>
               </li>
               <li>
-                <Link href="/features#lead-management" className="hover:text-white transition">
+                <Link href="/features#lead-routing" className="hover:text-white transition">
                   Lead Management System
                 </Link>
               </li>
               <li>
-                <Link href="/features#call-recording" className="hover:text-white transition">
-                  Call Tracking and Recording CRM
+                <Link href="/features#automatic-call-recording" className="hover:text-white transition">
+                  Call Tracking &amp; Recording CRM
                 </Link>
               </li>
               <li>
-                <Link href="/features#sales-management" className="hover:text-white transition">
-                  Sales Management Software
+                <Link href="/features#leaderboard-report" className="hover:text-white transition">
+                  Sales Management &amp; Leaderboards
                 </Link>
               </li>
               <li>
-                <Link href="/features#enterprise" className="hover:text-white transition">
-                  Enterprise CRM
+                <Link href="/features#custom-api-integration" className="hover:text-white transition">
+                  Enterprise CRM &amp; API
                 </Link>
               </li>
             </ul>
